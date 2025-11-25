@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import '../models/user_profile.dart';
-import '../theme.dart';
-import 'onboarding/step_widgets.dart';
-import 'onboarding/magic_moment_screen.dart';
+import '../../models/user_profile.dart';
+import '../../theme.dart';
+import 'step_widgets.dart';
+import 'magic_moment_screen.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});

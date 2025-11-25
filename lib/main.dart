@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'theme.dart'; // Renkleri buradan alıyoruz
-import 'screens/questionnaire_screen.dart';
+import 'theme.dart';
+import 'screens/onboarding_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,8 +29,7 @@ class HakoneApp extends StatelessWidget {
         ),
         useMaterial3: true,
       ),
-      // Uygulama Questionnaire ile başlar
-      home: const QuestionnaireScreen(), 
+      home: const OnboardingScreen(),
     );
   }
 }
