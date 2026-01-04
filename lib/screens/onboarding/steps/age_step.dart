@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../models/user_profile.dart';
+import '../../../theme.dart';
 import '../../../widgets/shadcn_components.dart';
 
 class AgeStep extends StatefulWidget {
@@ -49,34 +50,62 @@ class _AgeStepState extends State<AgeStep> {
       content: Center(
         child: SizedBox(
           height: 200,
-          child: PageView.builder(
-            controller: _pageController,
-            itemCount: _maxAge - _minAge + 1,
-            onPageChanged: (index) {
-              setState(() {
-                widget.profile.age = _minAge + index;
-              });
-            },
-            itemBuilder: (context, index) {
-              final age = _minAge + index;
-              final isSelected = widget.profile.age == age;
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              // Picker
+              PageView.builder(
+                controller: _pageController,
+                itemCount: _maxAge - _minAge + 1,
+                onPageChanged: (index) {
+                  setState(() {
+                    widget.profile.age = _minAge + index;
+                  });
+                },
+                itemBuilder: (context, index) {
+                  final age = _minAge + index;
+                  final isSelected = widget.profile.age == age;
 
-              return Center(
-                child: AnimatedDefaultTextStyle(
-                  duration: const Duration(milliseconds: 200),
-                  style: TextStyle(
-                    fontSize: isSelected ? 80 : 40,
-                    fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600,
-                    color: isSelected
-                        ? Colors.white
-                        : Colors.white.withValues(alpha: 0.2),
-                    letterSpacing: -2,
-                    height: 1.0,
+                  return Center(
+                    child: AnimatedDefaultTextStyle(
+                      duration: const Duration(milliseconds: 200),
+                      style: TextStyle(
+                        fontSize: isSelected ? 72 : 32,
+                        fontWeight: isSelected
+                            ? FontWeight.w700
+                            : FontWeight.w500,
+                        color: isSelected
+                            ? Colors.white
+                            : Colors.white.withValues(alpha: 0.2),
+                        letterSpacing: -2,
+                        height: 1.0,
+                      ),
+                      child: Text("$age"),
+                    ),
+                  );
+                },
+              ),
+
+              // Glowing Stick Indicator (Horizontal)
+              Positioned(
+                bottom: 40, // Positioned under the numbers
+                child: Container(
+                  width: 60,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.circular(2),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primary.withValues(alpha: 0.6),
+                        blurRadius: 12,
+                        spreadRadius: 2,
+                      ),
+                    ],
                   ),
-                  child: Text("$age"),
                 ),
-              );
-            },
+              ),
+            ],
           ),
         ),
       ),

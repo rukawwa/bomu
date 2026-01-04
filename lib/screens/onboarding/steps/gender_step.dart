@@ -36,7 +36,6 @@ class _GenderStepState extends State<GenderStep> {
                 gender: Gender.male,
                 icon: Icons.male_rounded,
                 label: "Erkek",
-                gradient: [const Color(0xFF3B82F6), const Color(0xFF1D4ED8)],
               ),
             ),
             const SizedBox(width: 16),
@@ -45,7 +44,6 @@ class _GenderStepState extends State<GenderStep> {
                 gender: Gender.female,
                 icon: Icons.female_rounded,
                 label: "Kadın",
-                gradient: [const Color(0xFFEC4899), const Color(0xFFBE185D)],
               ),
             ),
           ],
@@ -58,7 +56,6 @@ class _GenderStepState extends State<GenderStep> {
     required Gender gender,
     required IconData icon,
     required String label,
-    required List<Color> gradient,
   }) {
     final isSelected = widget.profile.gender == gender;
 
@@ -68,60 +65,67 @@ class _GenderStepState extends State<GenderStep> {
         setState(() => widget.profile.gender = gender);
       },
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 250),
-        curve: Curves.easeOutCubic,
-        height: 200,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.fastOutSlowIn,
+        height: 220,
         decoration: BoxDecoration(
-          gradient: isSelected
-              ? LinearGradient(
-                  colors: gradient,
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                )
-              : null,
-          color: isSelected ? null : AppColors.surface,
-          borderRadius: BorderRadius.circular(24),
+          color: isSelected
+              ? AppColors.primary.withValues(alpha: 0.1)
+              : AppColors.surface,
+          borderRadius: BorderRadius.circular(32),
           border: Border.all(
             color: isSelected
-                ? Colors.white.withValues(alpha: 0.3)
-                : Colors.white.withValues(alpha: 0.1),
-            width: isSelected ? 2 : 1,
+                ? AppColors.primary
+                : Colors.white.withValues(alpha: 0.05),
+            width: isSelected ? 3 : 1, // Thicker border for selection
           ),
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: gradient[0].withValues(alpha: 0.4),
-                    blurRadius: 24,
+                    color: AppColors.primary.withValues(alpha: 0.25),
+                    blurRadius: 20,
                     spreadRadius: 0,
-                    offset: const Offset(0, 8),
+                    offset: const Offset(0, 4),
                   ),
                 ]
-              : null,
+              : [],
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             AnimatedScale(
-              duration: const Duration(milliseconds: 250),
-              scale: isSelected ? 1.1 : 1.0,
-              child: Icon(
-                icon,
-                size: 64,
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.elasticOut,
+              scale: isSelected ? 1.15 : 1.0,
+              child: Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: isSelected
+                      ? AppColors.primary.withValues(alpha: 0.2)
+                      : Colors.white.withValues(alpha: 0.05),
+                ),
+                child: Icon(
+                  icon,
+                  size: 48,
+                  color: isSelected
+                      ? AppColors.primary
+                      : Colors.white.withValues(alpha: 0.5),
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            AnimatedDefaultTextStyle(
+              duration: const Duration(milliseconds: 200),
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                 color: isSelected
                     ? Colors.white
                     : Colors.white.withValues(alpha: 0.5),
+                letterSpacing: -0.5,
               ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: isSelected
-                    ? Colors.white
-                    : Colors.white.withValues(alpha: 0.6),
-              ),
+              child: Text(label),
             ),
           ],
         ),

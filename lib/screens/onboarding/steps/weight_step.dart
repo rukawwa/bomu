@@ -75,28 +75,6 @@ class _WeightStepState extends State<WeightStep> {
           // Custom Slider
           Column(
             children: [
-              // Scale ticks
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  for (
-                    var i = _minWeight.toInt();
-                    i <= _maxWeight.toInt();
-                    i += 20
-                  )
-                    Text(
-                      "$i",
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.white.withValues(alpha: 0.4),
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                ],
-              ),
-
-              const SizedBox(height: 8),
-
               // Slider Track
               SliderTheme(
                 data: SliderThemeData(
@@ -112,17 +90,23 @@ class _WeightStepState extends State<WeightStep> {
                   overlayShape: const RoundSliderOverlayShape(
                     overlayRadius: 28,
                   ),
+                  valueIndicatorColor: AppColors.primary,
+                  valueIndicatorTextStyle: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 child: Slider(
                   value: widget.profile.weightKg,
                   min: _minWeight,
                   max: _maxWeight,
+                  divisions: (_maxWeight - _minWeight)
+                      .toInt(), // Snap to integers
+                  label: widget.profile.weightKg.round().toString(),
                   onChanged: (value) {
                     HapticFeedback.selectionClick();
                     setState(() {
-                      // Round to 0.1 precision for slider drag
-                      widget.profile.weightKg =
-                          (value * 10).roundToDouble() / 10;
+                      widget.profile.weightKg = value;
                     });
                   },
                 ),
@@ -139,7 +123,7 @@ class _WeightStepState extends State<WeightStep> {
                     onTap: () {
                       if (widget.profile.weightKg > _minWeight) {
                         HapticFeedback.lightImpact();
-                        setState(() => widget.profile.weightKg -= 0.5);
+                        setState(() => widget.profile.weightKg -= 0.5); // 0.5kg
                       }
                     },
                   ),
@@ -149,7 +133,7 @@ class _WeightStepState extends State<WeightStep> {
                     onTap: () {
                       if (widget.profile.weightKg < _maxWeight) {
                         HapticFeedback.lightImpact();
-                        setState(() => widget.profile.weightKg += 0.5);
+                        setState(() => widget.profile.weightKg += 0.5); // 0.5kg
                       }
                     },
                   ),
