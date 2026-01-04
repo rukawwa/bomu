@@ -11,6 +11,9 @@ enum CoachingStyle { strict, supportive }
 enum DietType { classic, vegetarian, vegan, keto, paleo, pescatarian }
 
 class UserProfile {
+  // Personal
+  String name;
+
   // Biological
   Gender gender;
   int age;
@@ -44,6 +47,7 @@ class UserProfile {
   DateTime? estimatedGoalDate;
 
   UserProfile({
+    this.name = '',
     this.gender = Gender.male,
     this.age = 25,
     this.heightCm = 175,

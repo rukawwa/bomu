@@ -146,7 +146,7 @@ class _BioStepState extends State<BioStep> {
         padding: const EdgeInsets.symmetric(vertical: 24),
         decoration: BoxDecoration(
           color: isSelected
-              ? AppColors.primary.withOpacity(0.2)
+              ? AppColors.primary.withValues(alpha: 0.2)
               : Colors.white10,
           border: Border.all(
             color: isSelected ? AppColors.primary : Colors.transparent,
@@ -301,7 +301,7 @@ class _ActivityStepState extends State<ActivityStep> {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: isSelected
-              ? AppColors.primary.withOpacity(0.1)
+              ? AppColors.primary.withValues(alpha: 0.1)
               : Colors.white10,
           border: Border.all(
             color: isSelected ? AppColors.primary : Colors.transparent,
@@ -408,7 +408,7 @@ class _GoalStepState extends State<GoalStep> {
                 margin: const EdgeInsets.only(top: 16),
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.orange.withOpacity(0.2),
+                  color: Colors.orange.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Row(
@@ -439,7 +439,7 @@ class _GoalStepState extends State<GoalStep> {
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           color: isSelected
-              ? AppColors.primary.withOpacity(0.1)
+              ? AppColors.primary.withValues(alpha: 0.1)
               : Colors.white10,
           border: Border.all(
             color: isSelected ? AppColors.primary : Colors.transparent,
@@ -708,7 +708,7 @@ class _PsychologyStepState extends State<PsychologyStep> {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
           color: isSelected
-              ? AppColors.primary.withOpacity(0.1)
+              ? AppColors.primary.withValues(alpha: 0.1)
               : Colors.white10,
           border: Border.all(
             color: isSelected ? AppColors.primary : Colors.transparent,

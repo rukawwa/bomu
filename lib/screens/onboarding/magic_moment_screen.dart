@@ -43,11 +43,14 @@ class _MagicMomentScreenState extends State<MagicMomentScreen>
   void _startCalculation() async {
     // Simulate AI steps
     await Future.delayed(const Duration(seconds: 1));
-    if (mounted)
+    if (mounted) {
       setState(() => _loadingText = "Beslenme planı oluşturuluyor...");
+    }
 
     await Future.delayed(const Duration(seconds: 1));
-    if (mounted) setState(() => _loadingText = "Makrolar optimize ediliyor...");
+    if (mounted) {
+      setState(() => _loadingText = "Makrolar optimize ediliyor...");
+    }
 
     await Future.delayed(const Duration(seconds: 1));
 
@@ -99,9 +102,12 @@ class _MagicMomentScreenState extends State<MagicMomentScreen>
     int calorieGoal = tdee.toInt();
     if (widget.userProfile.goal == GoalType.lose) {
       calorieGoal -= 500; // Deficit
-      if (widget.userProfile.goalSpeed == GoalSpeed.aggressive)
+      if (widget.userProfile.goalSpeed == GoalSpeed.aggressive) {
         calorieGoal -= 200;
-      if (widget.userProfile.goalSpeed == GoalSpeed.slow) calorieGoal += 200;
+      }
+      if (widget.userProfile.goalSpeed == GoalSpeed.slow) {
+        calorieGoal += 200;
+      }
     } else if (widget.userProfile.goal == GoalType.gain) {
       calorieGoal += 300; // Surplus
     }
@@ -196,9 +202,11 @@ class _MagicMomentScreenState extends State<MagicMomentScreen>
               child: Container(
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.05),
+                  color: Colors.white.withValues(alpha: 0.05),
                   borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+                  border: Border.all(
+                    color: AppColors.primary.withValues(alpha: 0.3),
+                  ),
                 ),
                 child: Column(
                   children: [

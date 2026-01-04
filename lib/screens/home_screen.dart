@@ -80,7 +80,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   final ImagePicker _picker = ImagePicker();
 
   // Scroll Controller for AppBar visibility
-  late ScrollController _scrollController;
+  final ScrollController _scrollController = ScrollController();
   bool _showAppBarTitle = false;
 
   // Getters for Macros
@@ -98,7 +98,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     dailyGoal = widget.initialDailyGoal ?? 2200;
 
     // Scroll Controller Setup
-    _scrollController = ScrollController();
     _scrollController.addListener(() {
       if (_scrollController.offset > 300 && !_showAppBarTitle) {
         setState(() => _showAppBarTitle = true);
@@ -235,14 +234,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         decoration: BoxDecoration(
           color: AppColors.background,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withOpacity(0.3)),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
         ),
         child: Column(
           children: [
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
+                color: color.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: Icon(icon, color: color, size: 32),
@@ -427,9 +426,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         }
       }
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Hata: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Hata: $e')));
+      }
     } finally {
       setState(() => isScanning = false);
     }
@@ -560,8 +561,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           builder: (context, child) => CustomPaint(
             painter: PremiumRingPainter(
               percentage: _progressAnimation.value,
-              color: limitExceeded ? AppColors.secondary : AppColors.primary,
-              backgroundColor: Colors.white.withOpacity(0.05),
+              color: limitExceeded
+                  ? AppColors.secondary
+                  : AppColors.primaryDark,
+              backgroundColor: Colors.white.withValues(alpha: 0.05),
             ),
             child: Center(
               child: Column(
@@ -589,7 +592,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
-                      color: Colors.white.withOpacity(0.5),
+                      color: Colors.white.withValues(alpha: 0.5),
                       letterSpacing: 1.5,
                     ),
                   ),
@@ -606,9 +609,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
+        color: Colors.white.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.05)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
       ),
       child: Column(
         children: [
@@ -635,7 +638,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             height: 4,
             width: 40,
             decoration: BoxDecoration(
-              color: color.withOpacity(0.2),
+              color: color.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(2),
             ),
             child: FractionallySizedBox(
@@ -647,7 +650,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   borderRadius: BorderRadius.circular(2),
                   boxShadow: [
                     BoxShadow(
-                      color: color.withOpacity(0.5),
+                      color: color.withValues(alpha: 0.5),
                       blurRadius: 6,
                       offset: const Offset(0, 2),
                     ),
@@ -668,7 +671,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           padding: const EdgeInsets.all(24.0),
           child: Text(
             "Henüz yemek eklenmedi.",
-            style: TextStyle(color: Colors.white.withOpacity(0.5)),
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
           ),
         ),
       );
@@ -695,7 +698,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.05)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
       ),
       child: Row(
         children: [
@@ -734,7 +737,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     width: 120,
                     height: 16,
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.1),
+                      color: Colors.white.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(4),
                     ),
                   ),
@@ -743,7 +746,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     width: 80,
                     height: 12,
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.1),
+                      color: Colors.white.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(4),
                     ),
                   ),
@@ -798,16 +801,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         gradient: LinearGradient(
           colors: [
             const Color(0xFF1E293B),
-            const Color(0xFF1E293B).withOpacity(0.8),
+            const Color(0xFF1E293B).withValues(alpha: 0.8),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withOpacity(0.05)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.2),
+            color: Colors.black.withValues(alpha: 0.2),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -821,7 +824,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: Colors.blueAccent.withOpacity(0.2),
+                  color: Colors.blueAccent.withValues(alpha: 0.2),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
@@ -913,7 +916,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           width: 120,
           height: 4,
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.1),
+            color: Colors.white.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(2),
           ),
           child: FractionallySizedBox(
@@ -925,7 +928,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 borderRadius: BorderRadius.circular(2),
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.primary.withOpacity(0.8),
+                    color: AppColors.primary.withValues(alpha: 0.8),
                     blurRadius: 8,
                     spreadRadius: 2,
                   ),
@@ -970,7 +973,7 @@ class PremiumRingPainter extends CustomPainter {
     // Gradient Progress Ring
     final rect = Rect.fromCircle(center: center, radius: radius);
     final gradient = LinearGradient(
-      colors: [color.withOpacity(0.5), color],
+      colors: [color.withValues(alpha: 0.5), color],
       begin: Alignment.topLeft,
       end: Alignment.bottomRight,
     );
@@ -997,7 +1000,7 @@ class PremiumRingPainter extends CustomPainter {
       final tipY = center.dy + radius * math.sin(angle);
 
       final glowPaint = Paint()
-        ..color = color.withOpacity(0.5)
+        ..color = color.withValues(alpha: 0.5)
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10);
 
       canvas.drawCircle(Offset(tipX, tipY), 8, glowPaint);

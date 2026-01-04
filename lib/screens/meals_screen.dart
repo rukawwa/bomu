@@ -33,12 +33,14 @@ class MealsScreen extends StatelessWidget {
                   Icon(
                     Icons.no_meals_rounded,
                     size: 64,
-                    color: Colors.white.withOpacity(0.2),
+                    color: Colors.white.withValues(alpha: 0.2),
                   ),
                   const SizedBox(height: 16),
                   Text(
                     "Henüz yemek eklenmedi",
-                    style: TextStyle(color: Colors.white.withOpacity(0.4)),
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.4),
+                    ),
                   ),
                 ],
               ),
@@ -104,7 +106,9 @@ class MealsScreen extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: AppColors.surface,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.white.withOpacity(0.05)),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.05),
+                    ),
                   ),
                   child: Row(
                     children: [

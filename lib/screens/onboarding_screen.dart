@@ -1,8 +1,16 @@
 import 'package:flutter/material.dart';
 import '../models/user_profile.dart';
 import '../theme.dart';
-import 'onboarding/step_widgets.dart';
-import 'onboarding/magic_moment_screen.dart';
+import 'onboarding/steps/name_step.dart';
+import 'onboarding/steps/age_step.dart';
+import 'onboarding/steps/height_step.dart';
+import 'onboarding/steps/weight_step.dart';
+import 'onboarding/steps/gender_step.dart';
+import 'onboarding/steps/activity_step.dart';
+import 'onboarding/steps/goal_step.dart';
+import 'onboarding/steps/diet_step.dart';
+import 'onboarding/steps/calorie_step.dart';
+import 'onboarding/value_proposition_screen.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -14,7 +22,7 @@ class OnboardingScreen extends StatefulWidget {
 class _OnboardingScreenState extends State<OnboardingScreen> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
-  final int _totalPages = 5;
+  final int _totalPages = 9;
 
   // Data State
   final UserProfile _userProfile = UserProfile();
@@ -22,15 +30,20 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   void _nextPage() {
     if (_currentPage < _totalPages - 1) {
       _pageController.nextPage(
-        duration: const Duration(milliseconds: 500),
-        curve: Curves.easeInOut,
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeOutCubic,
       );
     } else {
-      // Go to Magic Moment
+      // Go to Value Proposition Screen (replaces Magic Moment)
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(
-          builder: (context) => MagicMomentScreen(userProfile: _userProfile),
+        PageRouteBuilder(
+          pageBuilder: (context, animation, secondaryAnimation) =>
+              ValuePropositionScreen(userProfile: _userProfile),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return FadeTransition(opacity: animation, child: child);
+          },
+          transitionDuration: const Duration(milliseconds: 500),
         ),
       );
     }
@@ -39,8 +52,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   void _previousPage() {
     if (_currentPage > 0) {
       _pageController.previousPage(
-        duration: const Duration(milliseconds: 500),
-        curve: Curves.easeInOut,
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeOutCubic,
       );
     }
   }
@@ -57,6 +70,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
               child: Row(
                 children: List.generate(_totalPages, (index) {
+                  final isCompleted = index < _currentPage;
+                  final isCurrent = index == _currentPage;
+
                   return Expanded(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 2.0),
@@ -64,9 +80,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         duration: const Duration(milliseconds: 300),
                         height: 4,
                         decoration: BoxDecoration(
-                          color: index <= _currentPage
+                          color: isCompleted
                               ? AppColors.primary
-                              : Colors.white10,
+                              : isCurrent
+                              ? AppColors.primary.withValues(alpha: 0.5)
+                              : Colors.white.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(2),
                         ),
                       ),
@@ -80,26 +98,63 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             Expanded(
               child: PageView(
                 controller: _pageController,
-                physics: const NeverScrollableScrollPhysics(), // Disable swipe
+                physics: const NeverScrollableScrollPhysics(),
                 onPageChanged: (index) => setState(() => _currentPage = index),
                 children: [
-                  BioStep(profile: _userProfile, onNext: _nextPage),
+                  // Step 1: Name
+                  NameStep(profile: _userProfile, onNext: _nextPage),
+
+                  // Step 2: Age
+                  AgeStep(
+                    profile: _userProfile,
+                    onNext: _nextPage,
+                    onBack: _previousPage,
+                  ),
+
+                  // Step 3: Height
+                  HeightStep(
+                    profile: _userProfile,
+                    onNext: _nextPage,
+                    onBack: _previousPage,
+                  ),
+
+                  // Step 4: Weight
+                  WeightStep(
+                    profile: _userProfile,
+                    onNext: _nextPage,
+                    onBack: _previousPage,
+                  ),
+
+                  // Step 5: Gender
+                  GenderStep(
+                    profile: _userProfile,
+                    onNext: _nextPage,
+                    onBack: _previousPage,
+                  ),
+
+                  // Step 6: Activity Level
                   ActivityStep(
                     profile: _userProfile,
                     onNext: _nextPage,
                     onBack: _previousPage,
                   ),
+
+                  // Step 7: Goal
                   GoalStep(
                     profile: _userProfile,
                     onNext: _nextPage,
                     onBack: _previousPage,
                   ),
-                  NutritionStep(
+
+                  // Step 8: Diet
+                  DietStep(
                     profile: _userProfile,
                     onNext: _nextPage,
                     onBack: _previousPage,
                   ),
-                  PsychologyStep(
+
+                  // Step 9: Calorie Summary (replaces Psychology)
+                  CalorieStep(
                     profile: _userProfile,
                     onNext: _nextPage,
                     onBack: _previousPage,

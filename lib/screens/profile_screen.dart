@@ -22,7 +22,7 @@ class ProfileScreen extends StatelessWidget {
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      AppColors.primary.withOpacity(0.2),
+                      AppColors.primary.withValues(alpha: 0.2),
                       AppColors.background,
                     ],
                   ),
@@ -126,7 +126,7 @@ class ProfileScreen extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.05)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
