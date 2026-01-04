@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -9,6 +10,8 @@ import 'package:image_picker/image_picker.dart';
 
 import '../theme.dart';
 import '../api_key.dart';
+import 'camera/camera_screen.dart';
+import 'camera/analysis_screen.dart';
 
 // --- MODELLER ---
 enum FoodType { healthy, unhealthy }
@@ -17,14 +20,15 @@ class FoodEntry {
   final String id;
   String name;
   int calories;
-  // NEW: Macros
+  // Macros
   int protein;
   int carbs;
   int fat;
   final FoodType type;
   final double time;
   final File? imageFile;
-  bool isLoading; // NEW: Skeleton Loading State
+  final Uint8List? imageBytes; // Cropped food thumbnail
+  bool isLoading;
 
   FoodEntry({
     required this.id,
@@ -36,6 +40,7 @@ class FoodEntry {
     required this.type,
     required this.time,
     this.imageFile,
+    this.imageBytes,
     this.isLoading = false,
   });
 }
@@ -174,9 +179,18 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     title: "Kamera",
                     subtitle: "AI Analizi",
                     color: AppColors.primary,
-                    onTap: () {
+                    onTap: () async {
                       Navigator.pop(context);
-                      _pickImage();
+                      final results =
+                          await Navigator.push<List<Map<String, dynamic>>>(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const CameraScreen(),
+                            ),
+                          );
+                      if (results != null && results.isNotEmpty) {
+                        _addFoodsFromAnalysis(results);
+                      }
                     },
                   ),
                 ),
@@ -436,18 +450,56 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
   }
 
-  Future<void> _pickImage() async {
-    final XFile? photo = await _picker.pickImage(source: ImageSource.camera);
-    if (photo != null) {
-      _analyzeImage(File(photo.path));
+  Future<void> _pickImageFromGallery() async {
+    final XFile? photo = await _picker.pickImage(source: ImageSource.gallery);
+    if (photo != null && mounted) {
+      final results = await Navigator.push<List<Map<String, dynamic>>>(
+        context,
+        MaterialPageRoute(
+          builder: (context) => AnalysisScreen(imagePath: photo.path),
+        ),
+      );
+      if (results != null && results.isNotEmpty && mounted) {
+        _addFoodsFromAnalysis(results);
+      }
     }
   }
 
-  Future<void> _pickImageFromGallery() async {
-    final XFile? photo = await _picker.pickImage(source: ImageSource.gallery);
-    if (photo != null) {
-      _analyzeImage(File(photo.path));
+  void _addFoodsFromAnalysis(List<Map<String, dynamic>> foods) {
+    final now = DateTime.now();
+    final decimalTime = now.hour + now.minute / 60.0;
+    final oldTotal = totalCalories;
+
+    for (final food in foods) {
+      final imageBytes = food['croppedImageBytes'] as Uint8List?;
+
+      widget.onAddEntry(
+        FoodEntry(
+          id: '${DateTime.now().millisecondsSinceEpoch}_${food['name']}',
+          name: food['name']?.toString() ?? 'Bilinmeyen',
+          calories: (food['calories'] as num?)?.toInt() ?? 0,
+          protein: (food['protein'] as num?)?.toInt() ?? 0,
+          carbs: (food['carbs'] as num?)?.toInt() ?? 0,
+          fat: (food['fat'] as num?)?.toInt() ?? 0,
+          type: food['type'] == 'healthy'
+              ? FoodType.healthy
+              : FoodType.unhealthy,
+          time: decimalTime,
+          imageBytes: imageBytes,
+        ),
+      );
     }
+
+    _updateProgressAnimation(oldTotal);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          '${foods.length} yemek eklendi! (+${foods.fold(0, (sum, f) => sum + ((f['calories'] as num?)?.toInt() ?? 0))} kcal)',
+        ),
+        backgroundColor: AppColors.primary,
+      ),
+    );
   }
 
   // --- UI BİLEŞENLERİ ---
@@ -709,14 +761,24 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             decoration: BoxDecoration(
               color: AppColors.background,
               borderRadius: BorderRadius.circular(12),
-              image: entry.imageFile != null
+              border: Border.all(
+                color: entry.type == FoodType.healthy
+                    ? AppColors.primary.withValues(alpha: 0.3)
+                    : AppColors.secondary.withValues(alpha: 0.3),
+              ),
+              image: entry.imageBytes != null
+                  ? DecorationImage(
+                      image: MemoryImage(entry.imageBytes!),
+                      fit: BoxFit.cover,
+                    )
+                  : entry.imageFile != null
                   ? DecorationImage(
                       image: FileImage(entry.imageFile!),
                       fit: BoxFit.cover,
                     )
                   : null,
             ),
-            child: entry.imageFile == null
+            child: (entry.imageBytes == null && entry.imageFile == null)
                 ? Icon(
                     Icons.restaurant,
                     color: entry.type == FoodType.healthy

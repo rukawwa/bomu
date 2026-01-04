@@ -1,8 +1,7 @@
+import 'dart:io';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'dart:io';
-import 'package:google_mlkit_object_detection/google_mlkit_object_detection.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../theme.dart';
 import 'analysis_screen.dart';
@@ -17,31 +16,24 @@ class CameraScreen extends StatefulWidget {
 class _CameraScreenState extends State<CameraScreen>
     with WidgetsBindingObserver {
   CameraController? _controller;
-  // ignore: unused_field
-  bool _isCameraInitialized = false;
-  // ignore: unused_field
   bool _isProcessing = false;
-  List<DetectedObject> _detectedObjects = [];
-  ObjectDetector? _objectDetector;
-  int _frameCounter = 0;
+  bool _permissionDenied = false;
+  String? _initError;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _initializeCamera();
-    _initializeDetector();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _controller?.dispose();
-    _objectDetector?.close();
     super.dispose();
   }
 
-  // Handle App Lifecycle (Background/Resume)
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (_controller == null || !_controller!.value.isInitialized) return;
@@ -53,119 +45,177 @@ class _CameraScreenState extends State<CameraScreen>
     }
   }
 
-  void _initializeDetector() {
-    // Standard Object Detector
-    final options = ObjectDetectorOptions(
-      mode: DetectionMode.stream,
-      classifyObjects: true,
-      multipleObjects: true,
-    );
-    _objectDetector = ObjectDetector(options: options);
-  }
-
   Future<void> _initializeCamera() async {
-    final status = await Permission.camera.request();
-    if (status != PermissionStatus.granted) {
-      if (mounted) Navigator.pop(context);
-      return;
+    if (mounted) {
+      setState(() {
+        _initError = null;
+      });
     }
 
-    final cameras = await availableCameras();
-    if (cameras.isEmpty) return;
-
-    final camera = cameras.firstWhere(
-      (c) => c.lensDirection == CameraLensDirection.back,
-      orElse: () => cameras.first,
-    );
-
-    _controller = CameraController(
-      camera,
-      ResolutionPreset.medium, // Medium is usually sufficient for detection
-      enableAudio: false,
-      imageFormatGroup: Platform.isAndroid
-          ? ImageFormatGroup.nv21
-          : ImageFormatGroup.bgra8888,
-    );
-
     try {
-      await _controller!.initialize();
-      if (!mounted) return;
-
-      // Start Image Stream
-      _controller!.startImageStream(_processImage);
-
-      setState(() => _isCameraInitialized = true);
-    } catch (e) {
-      debugPrint("Camera initialization error: $e");
-    }
-  }
-
-  Future<void> _processImage(CameraImage image) async {
-    if (_isProcessing || _objectDetector == null) return;
-
-    // Process every 3rd frame to optimize performance
-    _frameCounter++;
-    if (_frameCounter % 3 != 0) return;
-
-    _isProcessing = true;
-    try {
-      final inputImage = _inputImageFromCameraImage(image);
-      if (inputImage == null) {
-        _isProcessing = false;
+      final status = await Permission.camera.request();
+      final hasAccess = status.isGranted || status.isLimited;
+      if (!hasAccess) {
+        if (mounted) {
+          setState(() => _permissionDenied = true);
+        }
         return;
       }
 
-      final objects = await _objectDetector!.processImage(inputImage);
+      _permissionDenied = false;
+
+      await _controller?.dispose();
+
+      final cameras = await availableCameras();
+      if (cameras.isEmpty) {
+        throw 'Cihazda kamera bulunamadı';
+      }
+
+      final CameraDescription camera = cameras.firstWhere(
+        (c) => c.lensDirection == CameraLensDirection.back,
+        orElse: () => cameras.first,
+      );
+
+      final controller = CameraController(
+        camera,
+        ResolutionPreset.high,
+        enableAudio: false,
+        imageFormatGroup: Platform.isAndroid
+            ? ImageFormatGroup.nv21
+            : ImageFormatGroup.bgra8888,
+      );
+
+      await controller.initialize();
+      await controller.lockCaptureOrientation(DeviceOrientation.portraitUp);
+
+      if (!mounted) return;
+      setState(() {
+        _controller = controller;
+        _permissionDenied = false;
+        _initError = null;
+      });
+    } catch (e) {
+      debugPrint('Camera initialization error: $e');
       if (mounted) {
-        setState(() => _detectedObjects = objects);
+        setState(() {
+          _initError = 'Kamera başlatılamadı. Lütfen tekrar deneyin.';
+          _permissionDenied = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _captureAndAnalyze() async {
+    if (_controller == null ||
+        !_controller!.value.isInitialized ||
+        _isProcessing) {
+      return;
+    }
+
+    try {
+      setState(() => _isProcessing = true);
+      final XFile image = await _controller!.takePicture();
+
+      if (!mounted) return;
+
+      // Navigate to AnalysisScreen and get results
+      final results = await Navigator.push<List<Map<String, dynamic>>>(
+        context,
+        MaterialPageRoute(
+          builder: (context) => AnalysisScreen(imagePath: image.path),
+        ),
+      );
+
+      // Return results to caller (home_screen)
+      if (mounted && results != null) {
+        Navigator.pop(context, results);
+      } else if (mounted) {
+        // User cancelled without adding, just go back
+        Navigator.pop(context);
       }
     } catch (e) {
-      debugPrint("Error processing image: $e");
+      debugPrint('Capture error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Fotoğraf çekilemedi: $e')));
+      }
     } finally {
-      _isProcessing = false;
+      if (mounted) setState(() => _isProcessing = false);
     }
-  }
-
-  InputImage? _inputImageFromCameraImage(CameraImage image) {
-    if (_controller == null) return null;
-
-    final camera = _controller!.description;
-    final sensorOrientation = camera.sensorOrientation;
-    final rotation = InputImageRotationValue.fromRawValue(sensorOrientation);
-    if (rotation == null) return null;
-
-    final format = InputImageFormatValue.fromRawValue(image.format.raw);
-
-    // Validate format for platform
-    if (format == null ||
-        (Platform.isAndroid && format != InputImageFormat.nv21) ||
-        (Platform.isIOS && format != InputImageFormat.bgra8888)) {
-      return null;
-    }
-
-    if (image.planes.length != 1 && Platform.isAndroid) return null;
-
-    return InputImage.fromBytes(
-      bytes: _concatenatePlanes(image.planes),
-      metadata: InputImageMetadata(
-        size: Size(image.width.toDouble(), image.height.toDouble()),
-        rotation: rotation,
-        format: format,
-        bytesPerRow: image.planes.first.bytesPerRow,
-      ),
-    );
-  }
-
-  Uint8List _concatenatePlanes(List<Plane> planes) {
-    final allBytes = WriteBuffer();
-    for (final plane in planes) {
-      allBytes.putUint8List(plane.bytes);
-    }
-    return allBytes.done().buffer.asUint8List();
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_permissionDenied) {
+      return Scaffold(
+        backgroundColor: Colors.black,
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.lock, color: Colors.white70, size: 48),
+              const SizedBox(height: 12),
+              const Text(
+                'Kamera izni gerekli',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Ayarlar > Hakone > Kamera iznini açmalısın.',
+                style: TextStyle(color: Colors.white70),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: openAppSettings,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.black,
+                ),
+                child: const Text('Ayarları Aç'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_initError != null) {
+      return Scaffold(
+        backgroundColor: Colors.black,
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline, color: Colors.white70, size: 48),
+              const SizedBox(height: 12),
+              Text(
+                _initError!,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: _initializeCamera,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.black,
+                ),
+                child: const Text('Tekrar dene'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     if (_controller == null || !_controller!.value.isInitialized) {
       return const Scaffold(
         backgroundColor: Colors.black,
@@ -175,161 +225,27 @@ class _CameraScreenState extends State<CameraScreen>
       );
     }
 
-    // Get screen size for overlay scaling
-    final size = MediaQuery.of(context).size;
-
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // 1. Camera Preview
+          // Camera Preview
           CameraPreview(_controller!),
 
-          // 2. Robotic Overlay (Corner Brackets)
-          if (_objectDetector != null)
-            CustomPaint(
-              painter: _ObjectDetectorPainter(
-                _detectedObjects,
-                _controller!.value.previewSize!,
-                size,
-                _controller!.description.sensorOrientation,
-                _controller!.description.lensDirection,
-              ),
-            ),
+          // Focus Overlay
+          CustomPaint(painter: _FocusOverlayPainter(), child: Container()),
 
-          // 3. UI Layer
+          // UI Controls
           SafeArea(
             child: Column(
               children: [
-                // Top Header
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      IconButton(
-                        onPressed: () => Navigator.pop(context),
-                        icon: const Icon(
-                          Icons.close,
-                          color: Colors.white,
-                          size: 28,
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.black54,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: AppColors.primary.withValues(alpha: 0.5),
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.primary.withValues(alpha: 0.2),
-                              blurRadius: 10,
-                            ),
-                          ],
-                        ),
-                        child: const Row(
-                          children: [
-                            Icon(Icons.circle, size: 8, color: Colors.red),
-                            SizedBox(width: 8),
-                            Text(
-                              "SCANNING...",
-                              style: TextStyle(
-                                color: AppColors.primary,
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 1.2,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 48), // Balance Spacer
-                    ],
-                  ),
-                ),
-
+                _buildTopBar(),
                 const Spacer(),
-
-                // Capture Button
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 32),
-                  child: GestureDetector(
-                    onTap: () async {
-                      if (_controller == null ||
-                          !_controller!.value.isInitialized ||
-                          _isProcessing)
-                        return;
-
-                      try {
-                        setState(() => _isProcessing = true);
-
-                        // Stop stream to capture full res
-                        // Note: Some devices might need stopImageStream first
-                        await _controller!.stopImageStream();
-
-                        final XFile image = await _controller!.takePicture();
-
-                        if (!mounted) {
-                          return;
-                        }
-
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) =>
-                                AnalysisScreen(imagePath: image.path),
-                          ),
-                        ).then((_) {
-                          // Restart stream when coming back
-                          _controller!.startImageStream(_processImage);
-                          setState(() => _isProcessing = false);
-                        });
-                      } catch (e) {
-                        debugPrint("Capture error: $e");
-                        setState(() => _isProcessing = false);
-                      }
-                    },
-                    child: Container(
-                      width: 84,
-                      height: 84,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.5),
-                          width: 4,
-                        ),
-                        color: Colors.white10,
-                      ),
-                      child: Center(
-                        child: Container(
-                          width: 68,
-                          height: 68,
-                          decoration: const BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.white,
-                          ),
-                          child: const Center(
-                            child: Icon(
-                              Icons.camera_alt,
-                              color: Colors.black,
-                              size: 32,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
+                _buildGuideText(),
+                const SizedBox(height: 20),
+                _buildCaptureButton(),
+                const SizedBox(height: 40),
               ],
             ),
           ),
@@ -337,116 +253,221 @@ class _CameraScreenState extends State<CameraScreen>
       ),
     );
   }
-}
 
-// Custom Painter for "Robotic" Overlay
-class _ObjectDetectorPainter extends CustomPainter {
-  final List<DetectedObject> objects;
-  final Size imageSize;
-  final Size widgetSize;
-  final int rotation;
-  final CameraLensDirection cameraLensDirection;
-
-  _ObjectDetectorPainter(
-    this.objects,
-    this.imageSize,
-    this.widgetSize,
-    this.rotation,
-    this.cameraLensDirection,
-  );
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final Paint paint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3.0
-      ..color = AppColors.primary;
-
-    for (final object in objects) {
-      final rect = object.boundingBox;
-
-      // Coordinate Transformation
-      // This is simplified. For production, align aspect ratios accurately.
-      // Assuming Portrait Mode (height > width)
-
-      // Note: Android imageSize is usually landscape (e.g. 1280x720), so width > height.
-      // But screen is portrait.
-
-      final double scaleX = widgetSize.width / imageSize.height;
-      final double scaleY = widgetSize.height / imageSize.width;
-
-      // Simple scaling for Portrait
-      // Left = rect.left * scaleX
-      // Top = rect.top * scaleY
-      // Need to mirror if front camera (not used here) or adjust for sensor rotation
-
-      // Correct rect
-      final double left = rect.left * scaleX;
-      final double top = rect.top * scaleY;
-      final double right = rect.right * scaleX;
-      final double bottom = rect.bottom * scaleY;
-
-      final transformedRect = Rect.fromLTRB(left, top, right, bottom);
-
-      _drawCornerBrackets(canvas, transformedRect, paint);
-
-      // Optional: Draw Label "OBJECT DETECTED"
-      // _drawLabel(canvas, transformedRect);
-    }
+  Widget _buildTopBar() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          IconButton(
+            onPressed: () => Navigator.pop(context),
+            icon: const Icon(Icons.close, color: Colors.white, size: 28),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.black54,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: AppColors.primary.withValues(alpha: 0.5),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.primary.withValues(alpha: 0.2),
+                  blurRadius: 10,
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.circle,
+                  size: 8,
+                  color: _isProcessing ? Colors.orange : Colors.green,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  _isProcessing ? 'ÇEKILIYOR...' : 'HAZIR',
+                  style: const TextStyle(
+                    color: AppColors.primary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 48),
+        ],
+      ),
+    );
   }
 
-  void _drawCornerBrackets(Canvas canvas, Rect rect, Paint paint) {
-    final double cornerLength = 25.0;
+  Widget _buildGuideText() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 40),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.6),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.restaurant, color: AppColors.primary, size: 20),
+          SizedBox(width: 8),
+          Text(
+            'Tabağını çerçevenin içine yerleştir',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCaptureButton() {
+    return GestureDetector(
+      onTap: _isProcessing ? null : _captureAndAnalyze,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        width: 90,
+        height: 90,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: _isProcessing
+                ? Colors.white.withValues(alpha: 0.3)
+                : Colors.white.withValues(alpha: 0.6),
+            width: 4,
+          ),
+          color: Colors.white.withValues(alpha: 0.08),
+        ),
+        child: Center(
+          child: _isProcessing
+              ? const SizedBox(
+                  width: 40,
+                  height: 40,
+                  child: CircularProgressIndicator(
+                    color: AppColors.primary,
+                    strokeWidth: 3,
+                  ),
+                )
+              : Container(
+                  width: 70,
+                  height: 70,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white,
+                  ),
+                ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FocusOverlayPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final overlayPaint = Paint()..color = Colors.black.withValues(alpha: 0.5);
+    final cutoutPaint = Paint()
+      ..color = Colors.transparent
+      ..blendMode = BlendMode.clear;
+
+    final rect = Rect.fromLTWH(
+      20,
+      size.height * 0.20,
+      size.width - 40,
+      size.height * 0.50,
+    );
+
+    canvas.saveLayer(Rect.largest, Paint());
+    canvas.drawRect(Offset.zero & size, overlayPaint);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(rect, const Radius.circular(24)),
+      cutoutPaint,
+    );
+    canvas.restore();
+
+    // Draw border around focus area
+    final borderPaint = Paint()
+      ..color = AppColors.primary.withValues(alpha: 0.8)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(rect, const Radius.circular(24)),
+      borderPaint,
+    );
+
+    // Draw corner accents
+    _drawCornerAccents(canvas, rect);
+  }
+
+  void _drawCornerAccents(Canvas canvas, Rect rect) {
+    final accentPaint = Paint()
+      ..color = AppColors.primary
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 5
+      ..strokeCap = StrokeCap.round;
+
+    const double accentLength = 30.0;
+    const double offset = 1.5;
 
     // Top Left
     canvas.drawLine(
-      rect.topLeft,
-      rect.topLeft + Offset(cornerLength, 0),
-      paint,
+      Offset(rect.left + offset, rect.top + 24),
+      Offset(rect.left + offset, rect.top + 24 + accentLength),
+      accentPaint,
     );
     canvas.drawLine(
-      rect.topLeft,
-      rect.topLeft + Offset(0, cornerLength),
-      paint,
+      Offset(rect.left + 24, rect.top + offset),
+      Offset(rect.left + 24 + accentLength, rect.top + offset),
+      accentPaint,
     );
 
     // Top Right
     canvas.drawLine(
-      rect.topRight,
-      rect.topRight - Offset(cornerLength, 0),
-      paint,
+      Offset(rect.right - offset, rect.top + 24),
+      Offset(rect.right - offset, rect.top + 24 + accentLength),
+      accentPaint,
     );
     canvas.drawLine(
-      rect.topRight,
-      rect.topRight + Offset(0, cornerLength),
-      paint,
+      Offset(rect.right - 24, rect.top + offset),
+      Offset(rect.right - 24 - accentLength, rect.top + offset),
+      accentPaint,
     );
 
     // Bottom Left
     canvas.drawLine(
-      rect.bottomLeft,
-      rect.bottomLeft + Offset(cornerLength, 0),
-      paint,
+      Offset(rect.left + offset, rect.bottom - 24),
+      Offset(rect.left + offset, rect.bottom - 24 - accentLength),
+      accentPaint,
     );
     canvas.drawLine(
-      rect.bottomLeft,
-      rect.bottomLeft - Offset(0, cornerLength),
-      paint,
+      Offset(rect.left + 24, rect.bottom - offset),
+      Offset(rect.left + 24 + accentLength, rect.bottom - offset),
+      accentPaint,
     );
 
     // Bottom Right
     canvas.drawLine(
-      rect.bottomRight,
-      rect.bottomRight - Offset(cornerLength, 0),
-      paint,
+      Offset(rect.right - offset, rect.bottom - 24),
+      Offset(rect.right - offset, rect.bottom - 24 - accentLength),
+      accentPaint,
     );
     canvas.drawLine(
-      rect.bottomRight,
-      rect.bottomRight - Offset(0, cornerLength),
-      paint,
+      Offset(rect.right - 24, rect.bottom - offset),
+      Offset(rect.right - 24 - accentLength, rect.bottom - offset),
+      accentPaint,
     );
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
