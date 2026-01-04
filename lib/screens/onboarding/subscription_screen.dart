@@ -34,7 +34,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   // Column highlight color based on selection
   Color get _highlightColor => _isPlusSelected
       ? AppColors.primary.withValues(alpha: 0.15)
-      : const Color(0xFF2A2A3E);
+      : const Color(0xFF505065).withValues(alpha: 0.5);
 
   @override
   Widget build(BuildContext context) {
@@ -348,9 +348,20 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  SizedBox(
+                  Container(
                     width: double.infinity,
                     height: 56,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      gradient: _isPlusSelected
+                          ? const LinearGradient(
+                              colors: [Color(0xFFEE531B), Color(0xFFFC6C3A)],
+                              begin: Alignment.centerLeft,
+                              end: Alignment.centerRight,
+                            )
+                          : null,
+                      color: _isPlusSelected ? null : const Color(0xFF3A3A4E),
+                    ),
                     child: ElevatedButton(
                       onPressed: () {
                         Navigator.pushAndRemoveUntil(
@@ -365,12 +376,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                         );
                       },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: _isPlusSelected
-                            ? AppColors.primary
-                            : const Color(0xFF3A3A4E), // Solid dark color
-                        foregroundColor: _isPlusSelected
-                            ? Colors.black
-                            : Colors.white,
+                        backgroundColor: Colors.transparent,
+                        foregroundColor: Colors.white,
+                        shadowColor: Colors.transparent,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),
                         ),
@@ -382,7 +390,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                             : "Ücretsiz Başla",
                         style: const TextStyle(
                           fontSize: 17,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
                         ),
                       ),
                     ),
@@ -458,8 +467,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                       )
                     : LinearGradient(
                         colors: [
-                          const Color(0xFF2A2A3E),
-                          const Color(0xFF2A2A3E).withValues(alpha: 0.5),
+                          const Color(0xFF505065),
+                          const Color(0xFF353545),
                         ],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
@@ -471,11 +480,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: isSelected
-                ? (isPrimary ? AppColors.primary : const Color(0xFF2A2A3E))
-                : (isPrimary
-                      ? Colors.white.withValues(alpha: 0.1)
-                      : const Color(0xFF2A2A3E)),
-            width: isSelected || !isPrimary ? 2 : 1,
+                ? (isPrimary ? AppColors.primary : const Color(0xFF505065))
+                : Colors.white.withValues(alpha: 0.1),
+            width: isSelected ? 2 : 1,
           ),
         ),
         child: Column(
