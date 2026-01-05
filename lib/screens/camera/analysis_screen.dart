@@ -2,10 +2,9 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:image/image.dart' as img;
 import '../../theme.dart';
-import '../../api_key.dart';
+import '../../services/gemini_service.dart';
 
 class AnalysisScreen extends StatefulWidget {
   final String imagePath;
@@ -49,10 +48,6 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
 
   Future<void> _analyzeImage(Uint8List imageBytes) async {
     try {
-      if (googleGeminiApiKey.isEmpty) {
-        throw 'Gemini API anahtarı bulunamadı';
-      }
-
       final base64Image = base64Encode(imageBytes);
 
       const prompt = '''
@@ -80,46 +75,17 @@ Return ONLY a JSON array, no other text:
 If no food is detected, return empty array: []
 ''';
 
-      final response = await http.post(
-        Uri.parse(
-          'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$googleGeminiApiKey',
-        ),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          "contents": [
-            {
-              "role": "user",
-              "parts": [
-                {"text": prompt},
-                {
-                  "inlineData": {"mimeType": "image/jpeg", "data": base64Image},
-                },
-              ],
-            },
-          ],
-          "generationConfig": {"responseMimeType": "application/json"},
-        }),
+      // Use GeminiService to call Cloud Function (secure)
+      final foods = await GeminiService.analyzeFood(
+        base64Image: base64Image,
+        prompt: prompt,
       );
 
-      if (response.statusCode != 200) {
-        throw 'API hatası: ${response.statusCode}';
-      }
-
-      final data = jsonDecode(response.body);
-      final resultText =
-          data['candidates']?[0]['content']?['parts']?[0]['text'];
-
-      if (resultText == null) {
-        throw 'Analiz sonucu alınamadı';
-      }
-
-      final List<dynamic> foods = jsonDecode(resultText);
+      debugPrint('Detected foods: $foods');
 
       if (!mounted) return;
       setState(() {
-        _detectedFoods = foods
-            .map((f) => Map<String, dynamic>.from(f))
-            .toList();
+        _detectedFoods = foods;
       });
 
       // Crop food regions

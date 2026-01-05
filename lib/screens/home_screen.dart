@@ -1,15 +1,13 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 
 import '../theme.dart';
-import '../api_key.dart';
+
 import 'camera/camera_screen.dart';
 import 'camera/analysis_screen.dart';
 
@@ -70,8 +68,13 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
-  final String apiKey = googleGeminiApiKey;
   late int dailyGoal;
+
+  // -- NEW: Goals & State for Detailed view --
+  int get proteinGoal => 150;
+  int get carbsGoal => 275;
+  int get fatGoal => 75;
+  bool _showDetailedMacros = false; // Toggles between "100g" and "100/150g"
 
   bool isScanning = false;
   int waterGlasses = 0; // NEW: Water Tracking
@@ -368,88 +371,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  // --- NEW: GEMINI WITH MACROS ---
-  Future<void> _analyzeImage(File imageFile) async {
-    if (apiKey.isEmpty) return;
-    setState(() => isScanning = true);
-    try {
-      final bytes = await imageFile.readAsBytes();
-      final base64Image = base64Encode(bytes);
-
-      // UPDATED PROMPT FOR MACROS
-      const prompt = """
-        Analyze this food image. Return ONLY a JSON object. No markdown, no text.
-        Structure:
-        {
-          "name": "Food Name (Turkish)",
-          "calories": (int estimate),
-          "protein": (int estimate in grams),
-          "carbs": (int estimate in grams),
-          "fat": (int estimate in grams),
-          "type": "healthy" or "unhealthy"
-        }
-      """;
-
-      final response = await http.post(
-        Uri.parse(
-          'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=$apiKey',
-        ),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          "contents": [
-            {
-              "role": "user",
-              "parts": [
-                {"text": prompt},
-                {
-                  "inlineData": {"mimeType": "image/jpeg", "data": base64Image},
-                },
-              ],
-            },
-          ],
-          "generationConfig": {"responseMimeType": "application/json"},
-        }),
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final resultText =
-            data['candidates']?[0]['content']?['parts']?[0]['text'];
-
-        if (resultText != null) {
-          final analysis = jsonDecode(resultText);
-          int oldTotal = totalCalories;
-
-          widget.onAddEntry(
-            FoodEntry(
-              id: DateTime.now().millisecondsSinceEpoch.toString(),
-              name: analysis['name'],
-              calories: analysis['calories'] ?? 0,
-              protein: analysis['protein'] ?? 0, // NEW
-              carbs: analysis['carbs'] ?? 0, // NEW
-              fat: analysis['fat'] ?? 0, // NEW
-              type: analysis['type'] == 'healthy'
-                  ? FoodType.healthy
-                  : FoodType.unhealthy,
-              time: currentTime.hour + currentTime.minute / 60.0,
-              imageFile: imageFile,
-            ),
-          );
-
-          _updateProgressAnimation(oldTotal);
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Hata: $e')));
-      }
-    } finally {
-      setState(() => isScanning = false);
-    }
-  }
-
   Future<void> _pickImageFromGallery() async {
     final XFile? photo = await _picker.pickImage(source: ImageSource.gallery);
     if (photo != null && mounted) {
@@ -546,6 +467,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         child: _buildMacroIndicator(
                           "Protein",
                           totalProtein,
+                          proteinGoal,
                           Colors.purpleAccent,
                         ),
                       ),
@@ -554,6 +476,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         child: _buildMacroIndicator(
                           "Carbs",
                           totalCarbs,
+                          carbsGoal,
                           Colors.orangeAccent,
                         ),
                       ),
@@ -562,6 +485,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         child: _buildMacroIndicator(
                           "Fat",
                           totalFat,
+                          fatGoal,
                           Colors.amberAccent,
                         ),
                       ),
@@ -605,50 +529,101 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   Widget _buildMainTracker(bool limitExceeded) {
     return Center(
-      child: SizedBox(
-        width: 240,
-        height: 240,
-        child: AnimatedBuilder(
-          animation: _progressAnimation,
-          builder: (context, child) => CustomPaint(
-            painter: PremiumRingPainter(
-              percentage: _progressAnimation.value,
-              color: limitExceeded
-                  ? AppColors.secondary
-                  : AppColors.primaryDark,
-              backgroundColor: Colors.white.withValues(alpha: 0.05),
-            ),
-            child: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(
-                    Icons.local_fire_department_rounded,
-                    color: Colors.orangeAccent,
-                    size: 24,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    "$remaining",
-                    style: const TextStyle(
-                      fontSize: 56,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.white,
-                      height: 1.0,
-                      letterSpacing: -1,
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            _showDetailedMacros = !_showDetailedMacros;
+          });
+        },
+        child: SizedBox(
+          width: 240,
+          height: 240,
+          child: AnimatedBuilder(
+            animation: _progressAnimation,
+            builder: (context, child) => CustomPaint(
+              painter: PremiumRingPainter(
+                percentage: _progressAnimation.value,
+                color: limitExceeded
+                    ? AppColors.secondary
+                    : AppColors.primaryDark,
+                backgroundColor: Colors.white.withValues(alpha: 0.05),
+              ),
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.local_fire_department_rounded,
+                      color: Colors.orangeAccent,
+                      size: 24,
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    "KCAL LEFT",
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white.withValues(alpha: 0.5),
-                      letterSpacing: 1.5,
+                    const SizedBox(height: 8),
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 300),
+                      transitionBuilder:
+                          (Widget child, Animation<double> animation) {
+                            return FadeTransition(
+                              opacity: animation,
+                              child: child,
+                            );
+                          },
+                      child: _showDetailedMacros
+                          ? RichText(
+                              key: const ValueKey<bool>(true),
+                              text: TextSpan(
+                                children: [
+                                  TextSpan(
+                                    text: "$totalCalories",
+                                    style: const TextStyle(
+                                      fontSize: 40,
+                                      fontWeight: FontWeight.w900,
+                                      color: Colors.white,
+                                      height: 1.0,
+                                      letterSpacing: -1,
+                                    ),
+                                  ),
+                                  TextSpan(
+                                    text: " / $dailyGoal",
+                                    style: TextStyle(
+                                      fontSize: 24, // Smaller
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white.withValues(
+                                        alpha: 0.5,
+                                      ), // Gray
+                                      height: 1.0,
+                                      letterSpacing: -0.5,
+                                    ),
+                                  ),
+                                  const WidgetSpan(
+                                    child: SizedBox(width: 4),
+                                  ), // Padding
+                                ],
+                              ),
+                            )
+                          : Text(
+                              "$totalCalories",
+                              key: const ValueKey<bool>(false),
+                              style: const TextStyle(
+                                fontSize: 56, // Original large size
+                                fontWeight: FontWeight.w900,
+                                color: Colors.white,
+                                height: 1.0,
+                                letterSpacing: -1,
+                              ),
+                            ),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 4),
+                    Text(
+                      "KCAL",
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white.withValues(alpha: 0.5),
+                        letterSpacing: 1.5,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -657,61 +632,105 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildMacroIndicator(String label, int value, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-      ),
-      child: Column(
-        children: [
-          Text(
-            label.toUpperCase(),
-            style: const TextStyle(
-              color: AppColors.textMuted,
-              fontSize: 10,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1.2,
+  Widget _buildMacroIndicator(
+    String label,
+    int value,
+    int target,
+    Color color,
+  ) {
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _showDetailedMacros = !_showDetailedMacros;
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+        ),
+        child: Column(
+          children: [
+            Text(
+              label.toUpperCase(),
+              style: const TextStyle(
+                color: AppColors.textMuted,
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1.2,
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            "${value}g",
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 18,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Container(
-            height: 4,
-            width: 40,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(2),
-            ),
-            child: FractionallySizedBox(
-              alignment: Alignment.centerLeft,
-              widthFactor: (value / 150).clamp(0.0, 1.0),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: color,
-                  borderRadius: BorderRadius.circular(2),
-                  boxShadow: [
-                    BoxShadow(
-                      color: color.withValues(alpha: 0.5),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
+            const SizedBox(height: 8),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 300),
+              child: _showDetailedMacros
+                  ? RichText(
+                      key: const ValueKey<bool>(true),
+                      textAlign: TextAlign.center,
+                      text: TextSpan(
+                        children: [
+                          TextSpan(
+                            text: "$value",
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
+                            ),
+                          ),
+                          const WidgetSpan(
+                            child: SizedBox(width: 2),
+                          ), // Padding
+                          TextSpan(
+                            text: "/${target}g",
+                            style: const TextStyle(
+                              color: AppColors.textMuted, // Gray like title
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14, // 16px - 2px
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : Text(
+                      "${value}g",
+                      key: const ValueKey<bool>(false),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
                     ),
-                  ],
+            ),
+            const SizedBox(height: 8),
+            Container(
+              height: 4,
+              width: 40,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(2),
+              ),
+              child: FractionallySizedBox(
+                alignment: Alignment.centerLeft,
+                widthFactor: (value / target).clamp(0.0, 1.0),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: color,
+                    borderRadius: BorderRadius.circular(2),
+                    boxShadow: [
+                      BoxShadow(
+                        color: color.withValues(alpha: 0.5),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

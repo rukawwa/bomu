@@ -23,144 +23,119 @@ class WeightStep extends StatefulWidget {
 class _WeightStepState extends State<WeightStep> {
   final double _minWeight = 40;
   final double _maxWeight = 150;
+  late FixedExtentScrollController _scrollController;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController = FixedExtentScrollController(
+      initialItem: (widget.profile.weightKg - _minWeight).round(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    // Show 1 decimal place if it has a decimal part, otherwise integer
-    final isWhole = widget.profile.weightKg % 1 == 0;
-    final displayWeight = isWhole
-        ? widget.profile.weightKg.toInt().toString()
-        : widget.profile.weightKg.toStringAsFixed(1);
-
     return OnboardingStepLayout(
       title: "Şu anki kilon?",
       subtitle:
           "Günlük kalori ihtiyacını hesaplamak için kilonu bilmemiz gerekiyor.",
       onNext: widget.onNext,
       onBack: widget.onBack,
-      content: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          // Weight Display (No Box)
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                displayWeight,
-                style: const TextStyle(
-                  fontSize: 72,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
-                  letterSpacing: -2,
-                  height: 1,
-                ),
-              ),
-              const Padding(
-                padding: EdgeInsets.only(bottom: 12),
-                child: Text(
-                  " kg",
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.textMuted,
-                  ),
-                ),
-              ),
-            ],
-          ),
+      content: LayoutBuilder(
+        builder: (context, constraints) {
+          final maxWidth = constraints.maxWidth;
+          final buttonWidthBase = 120.0;
+          final availableGrowWidth =
+              maxWidth - buttonWidthBase; // Padding handled by layout?
 
-          const SizedBox(height: 48),
+          // Calculate progress 0.0 -> 1.0
+          final progress =
+              (widget.profile.weightKg - _minWeight) /
+              (_maxWeight - _minWeight);
 
-          // Custom Slider
-          Column(
-            children: [
-              // Slider Track
-              SliderTheme(
-                data: SliderThemeData(
-                  trackHeight: 8,
-                  activeTrackColor: AppColors.primary,
-                  inactiveTrackColor: Colors.white.withValues(alpha: 0.1),
-                  thumbColor: Colors.white,
-                  thumbShape: const RoundSliderThumbShape(
-                    enabledThumbRadius: 16,
-                    elevation: 4,
-                  ),
-                  overlayColor: AppColors.primary.withValues(alpha: 0.2),
-                  overlayShape: const RoundSliderOverlayShape(
-                    overlayRadius: 28,
-                  ),
-                  valueIndicatorColor: AppColors.primary,
-                  valueIndicatorTextStyle: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                child: Slider(
-                  value: widget.profile.weightKg,
-                  min: _minWeight,
-                  max: _maxWeight,
-                  divisions: (_maxWeight - _minWeight)
-                      .toInt(), // Snap to integers
-                  label: widget.profile.weightKg.round().toString(),
-                  onChanged: (value) {
-                    HapticFeedback.selectionClick();
-                    setState(() {
-                      widget.profile.weightKg = value;
-                    });
-                  },
-                ),
-              ),
+          // Dynamic width calculation
+          final currentWidth =
+              buttonWidthBase + (availableGrowWidth * progress);
 
-              const SizedBox(height: 16),
-
-              // Quick adjust buttons
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+          return Center(
+            child: SizedBox(
+              height: 300,
+              child: Stack(
+                alignment: Alignment.center,
                 children: [
-                  _buildAdjustButton(
-                    icon: Icons.remove,
-                    onTap: () {
-                      if (widget.profile.weightKg > _minWeight) {
-                        HapticFeedback.lightImpact();
-                        setState(() => widget.profile.weightKg -= 0.5); // 0.5kg
-                      }
-                    },
+                  // Dynamic Background Indicator
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeOutCubic,
+                    width: currentWidth.clamp(buttonWidthBase, maxWidth),
+                    height: 60,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: AppColors.primary.withValues(alpha: 0.5),
+                        width: 1,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primary.withValues(alpha: 0.1),
+                          blurRadius: 12,
+                          spreadRadius: 2,
+                        ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(width: 24),
-                  _buildAdjustButton(
-                    icon: Icons.add,
-                    onTap: () {
-                      if (widget.profile.weightKg < _maxWeight) {
-                        HapticFeedback.lightImpact();
-                        setState(() => widget.profile.weightKg += 0.5); // 0.5kg
-                      }
+
+                  // Wheel Picker
+                  ListWheelScrollView.useDelegate(
+                    controller: _scrollController,
+                    itemExtent: 60,
+                    perspective: 0.003,
+                    diameterRatio: 1.5,
+                    physics: const FixedExtentScrollPhysics(),
+                    onSelectedItemChanged: (index) {
+                      HapticFeedback.selectionClick();
+                      setState(() {
+                        widget.profile.weightKg = _minWeight + index;
+                      });
                     },
+                    childDelegate: ListWheelChildBuilderDelegate(
+                      childCount: (_maxWeight - _minWeight).toInt() + 1,
+                      builder: (context, index) {
+                        final weight = _minWeight + index;
+                        final isSelected =
+                            widget.profile.weightKg.round() == weight;
+
+                        return Center(
+                          child: AnimatedDefaultTextStyle(
+                            duration: const Duration(milliseconds: 200),
+                            style: TextStyle(
+                              fontSize: isSelected ? 40 : 24,
+                              fontWeight: isSelected
+                                  ? FontWeight.w700
+                                  : FontWeight.w500,
+                              color: isSelected
+                                  ? Colors.white
+                                  : Colors.white.withValues(alpha: 0.3),
+                              letterSpacing: -1,
+                            ),
+                            child: Text("${weight.toInt()} kg"),
+                          ),
+                        );
+                      },
+                    ),
                   ),
                 ],
               ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAdjustButton({
-    required IconData icon,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 56,
-        height: 56,
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-        ),
-        child: Icon(icon, color: Colors.white, size: 24),
+            ),
+          );
+        },
       ),
     );
   }

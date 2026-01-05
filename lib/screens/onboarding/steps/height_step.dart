@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../models/user_profile.dart';
 import '../../../theme.dart';
 import '../../../widgets/shadcn_components.dart';
@@ -24,6 +25,7 @@ class _HeightStepState extends State<HeightStep> {
   final double _minHeight = 140;
   final double _maxHeight = 220;
   final double _itemWidth = 12;
+  int? _lastHapticValue;
 
   @override
   void initState() {
@@ -36,8 +38,17 @@ class _HeightStepState extends State<HeightStep> {
   void _onScroll() {
     final offset = _scrollController.offset;
     final height = _minHeight + (offset / _itemWidth);
+    final clampedHeight = height.clamp(_minHeight, _maxHeight);
+
+    // Haptic feedback logic
+    final int roundedHeight = clampedHeight.round();
+    if (_lastHapticValue != roundedHeight) {
+      HapticFeedback.selectionClick();
+      _lastHapticValue = roundedHeight;
+    }
+
     setState(() {
-      widget.profile.heightCm = height.clamp(_minHeight, _maxHeight);
+      widget.profile.heightCm = clampedHeight;
     });
   }
 

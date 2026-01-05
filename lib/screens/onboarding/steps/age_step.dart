@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../models/user_profile.dart';
 import '../../../theme.dart';
 import '../../../widgets/shadcn_components.dart';
@@ -53,37 +54,56 @@ class _AgeStepState extends State<AgeStep> {
           child: Stack(
             alignment: Alignment.center,
             children: [
-              // Picker
-              PageView.builder(
-                controller: _pageController,
-                itemCount: _maxAge - _minAge + 1,
-                onPageChanged: (index) {
-                  setState(() {
-                    widget.profile.age = _minAge + index;
-                  });
-                },
-                itemBuilder: (context, index) {
-                  final age = _minAge + index;
-                  final isSelected = widget.profile.age == age;
+              // Horizontal Wheel Scroll View (Rotated ListWheelScrollView)
+              RotatedBox(
+                quarterTurns: -1,
+                child: ListWheelScrollView.useDelegate(
+                  controller: FixedExtentScrollController(
+                    initialItem: widget.profile.age - _minAge,
+                  ),
+                  itemExtent: 70, // Width of each item when rotated
+                  perspective: 0.002,
+                  diameterRatio: 1.5,
+                  physics: const FixedExtentScrollPhysics(),
+                  onSelectedItemChanged: (index) {
+                    HapticFeedback.selectionClick();
+                    setState(() {
+                      widget.profile.age = _minAge + index;
+                    });
+                  },
+                  childDelegate: ListWheelChildBuilderDelegate(
+                    childCount: _maxAge - _minAge + 1,
+                    builder: (context, index) {
+                      final age = _minAge + index;
+                      final isSelected = widget.profile.age == age;
 
-                  return Center(
-                    child: AnimatedDefaultTextStyle(
-                      duration: const Duration(milliseconds: 200),
-                      style: TextStyle(
-                        fontSize: isSelected ? 72 : 32,
-                        fontWeight: isSelected
-                            ? FontWeight.w700
-                            : FontWeight.w500,
-                        color: isSelected
-                            ? Colors.white
-                            : Colors.white.withValues(alpha: 0.2),
-                        letterSpacing: -2,
-                        height: 1.0,
-                      ),
-                      child: Text("$age"),
-                    ),
-                  );
-                },
+                      return RotatedBox(
+                        quarterTurns: 1,
+                        child: OverflowBox(
+                          minWidth: 0,
+                          maxWidth: double.infinity,
+                          child: Center(
+                            child: AnimatedDefaultTextStyle(
+                              duration: const Duration(milliseconds: 200),
+                              style: TextStyle(
+                                fontSize: isSelected ? 72 : 32,
+                                fontWeight: isSelected
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
+                                color: isSelected
+                                    ? Colors.white
+                                    : Colors.white.withValues(alpha: 0.2),
+                                letterSpacing: -2,
+                                height: 1.0,
+                              ),
+                              child: Text("$age"),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
               ),
 
               // Glowing Stick Indicator (Horizontal)

@@ -46,3 +46,6 @@ app.*.map.json
 
 # API Key
 lib/api_key.dart
+
+# Firebase Functions
+functions/node_modules/

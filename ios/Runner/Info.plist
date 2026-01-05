@@ -51,5 +51,7 @@
 	<string>Galeriden yemek fotoğrafı seçmek için izne ihtiyacımız var.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Video kaydı için mikrofona erişim izni gerekiyor.</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>

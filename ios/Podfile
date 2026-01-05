@@ -1,7 +1,7 @@
 # Prefer CDN to avoid git clone/SSL issues
 source 'https://cdn.cocoapods.org/'
 # Uncomment this line to define a global platform for your project
-platform :ios, '15.5'
+platform :ios, '17.0'
 
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
@@ -44,7 +44,7 @@ post_install do |installer|
 
     target.build_configurations.each do |config|
       # Align all pods to the app deployment target to silence Xcode warnings.
-      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.5'
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '17.0'
 
       # Enable permission_handler macros for iOS
       # This is REQUIRED for permission_handler to work properly on iOS
