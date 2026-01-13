@@ -28,16 +28,62 @@ class _DietStepState extends State<DietStep> {
     _DietOption(type: DietType.keto, label: "Keto", emoji: "🥩"),
     _DietOption(type: DietType.paleo, label: "Paleo", emoji: "🦴"),
     _DietOption(type: DietType.pescatarian, label: "Pescatarian", emoji: "🐟"),
+    _DietOption(type: DietType.halal, label: "Helal", emoji: "🕌"),
   ];
 
   final List<String> _allergies = [
     "Gluten",
-    "Süt Ürünleri",
-    "Fıstık",
+    "Kabuklu Deniz Ürünleri",
     "Yumurta",
-    "Deniz Ürünleri",
+    "Balık",
+    "Fıstık",
     "Soya",
+    "Süt (Laktoz)",
+    "Kuruyemişler",
+    "Kereviz",
+    "Hardal",
+    "Susam",
+    "Sülfitler",
+    "Acı Bakla (Lupin)",
+    "Yumuşakçalar",
   ];
+
+  bool _isAddingAllergen = false;
+  final TextEditingController _allergenController = TextEditingController();
+  final FocusNode _allergenFocusNode = FocusNode();
+
+  @override
+  void dispose() {
+    _allergenController.dispose();
+    _allergenFocusNode.dispose();
+    super.dispose();
+  }
+
+  void _addNewAllergen() {
+    final text = _allergenController.text.trim();
+    if (text.isNotEmpty) {
+      setState(() {
+        if (!_allergies.contains(text)) {
+          // Add to the local display list if not present, though ideally we might want to keep the base list clean
+          // But for UX, showing it in the "list" might be confusing if it wasn't there before.
+          // However, user just wants to "add" it.
+          // Let's add it to the profile directly and also maybe to our local list to show it selected?
+          // Actually, the UI iterates over `_allergies`. If I don't add it there, I can't select it easily with the current logic.
+          // Let's add it to _allergies so it renders.
+          _allergies.add(text);
+        }
+        if (!widget.profile.allergies.contains(text)) {
+          widget.profile.allergies.add(text);
+        }
+        _isAddingAllergen = false;
+        _allergenController.clear();
+      });
+    } else {
+      setState(() {
+        _isAddingAllergen = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -61,8 +107,8 @@ class _DietStepState extends State<DietStep> {
             ),
             const SizedBox(height: 12),
             Wrap(
-              spacing: 10,
-              runSpacing: 10,
+              spacing: 12,
+              runSpacing: 12,
               children: _diets.map((diet) {
                 final isSelected = widget.profile.dietType == diet.type;
                 return GestureDetector(
@@ -119,113 +165,130 @@ class _DietStepState extends State<DietStep> {
             Wrap(
               spacing: 10,
               runSpacing: 10,
-              children: _allergies.map((allergy) {
-                final isSelected = widget.profile.allergies.contains(allergy);
-                return GestureDetector(
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    setState(() {
-                      if (isSelected) {
-                        widget.profile.allergies.remove(allergy);
-                      } else {
-                        widget.profile.allergies.add(allergy);
-                      }
-                    });
-                  },
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 10,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? Colors.redAccent.withValues(alpha: 0.2)
-                          : AppColors.surface,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: isSelected
-                            ? Colors.redAccent
-                            : Colors.white.withValues(alpha: 0.1),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (isSelected)
-                          const Padding(
-                            padding: EdgeInsets.only(right: 6),
-                            child: Icon(
-                              Icons.close,
-                              size: 16,
-                              color: Colors.redAccent,
-                            ),
-                          ),
-                        Text(
-                          allergy,
-                          style: TextStyle(
-                            color: isSelected ? Colors.redAccent : Colors.white,
-                            fontWeight: FontWeight.w500,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-
-            const SizedBox(height: 32),
-
-            // Meals per day
-            const Text(
-              "Günlük Öğün Sayısı",
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-                fontSize: 16,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [2, 3, 4, 5].map((count) {
-                final isSelected = widget.profile.mealsPerDay == count;
-                return Expanded(
-                  child: GestureDetector(
+              children: [
+                ..._allergies.map((allergy) {
+                  final isSelected = widget.profile.allergies.contains(allergy);
+                  return GestureDetector(
                     onTap: () {
                       HapticFeedback.selectionClick();
-                      setState(() => widget.profile.mealsPerDay = count);
+                      setState(() {
+                        if (isSelected) {
+                          widget.profile.allergies.remove(allergy);
+                        } else {
+                          widget.profile.allergies.add(allergy);
+                        }
+                      });
                     },
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
-                      margin: EdgeInsets.only(right: count < 5 ? 10 : 0),
-                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
+                      ),
                       decoration: BoxDecoration(
                         color: isSelected
-                            ? AppColors.primary
+                            ? Colors.redAccent.withValues(alpha: 0.2)
                             : AppColors.surface,
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(10),
                         border: Border.all(
                           color: isSelected
-                              ? AppColors.primary
+                              ? Colors.redAccent
                               : Colors.white.withValues(alpha: 0.1),
                         ),
                       ),
-                      child: Center(
-                        child: Text(
-                          "$count",
-                          style: TextStyle(
-                            color: isSelected ? Colors.black : Colors.white,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 18,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (isSelected)
+                            const Padding(
+                              padding: EdgeInsets.only(right: 6),
+                              child: Icon(
+                                Icons.close,
+                                size: 16,
+                                color: Colors.redAccent,
+                              ),
+                            ),
+                          Text(
+                            allergy,
+                            style: TextStyle(
+                              color: isSelected
+                                  ? Colors.redAccent
+                                  : Colors.white,
+                              fontWeight: FontWeight.w500,
+                              fontSize: 14,
+                            ),
                           ),
+                        ],
+                      ),
+                    ),
+                  );
+                }),
+
+                // Add Allergen Chip
+                if (_isAddingAllergen)
+                  Container(
+                    width: 150,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: AppColors.primary),
+                    ),
+                    child: TextField(
+                      controller: _allergenController,
+                      focusNode: _allergenFocusNode,
+                      style: const TextStyle(color: Colors.white, fontSize: 14),
+                      decoration: const InputDecoration(
+                        hintText: "Yaz...",
+                        hintStyle: TextStyle(color: Colors.white54),
+                        border: InputBorder.none,
+                        isDense: true,
+                        contentPadding: EdgeInsets.symmetric(vertical: 10),
+                      ),
+                      onSubmitted: (_) => _addNewAllergen(),
+                    ),
+                  )
+                else
+                  GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _isAddingAllergen = true;
+                      });
+                      Future.delayed(const Duration(milliseconds: 100), () {
+                        _allergenFocusNode.requestFocus();
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: AppColors.primary.withValues(alpha: 0.5),
+                          style: BorderStyle.solid,
                         ),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.add, size: 16, color: AppColors.primary),
+                          SizedBox(width: 6),
+                          Text(
+                            "Alerjen Ekle",
+                            style: TextStyle(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w500,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
-                );
-              }).toList(),
+              ],
             ),
           ],
         ),

@@ -121,19 +121,6 @@ class _CalorieStepState extends State<CalorieStep>
     }
   }
 
-  String get _activityLabel {
-    switch (widget.profile.activityLevel) {
-      case ActivityLevel.sedentary:
-        return "Masa başı";
-      case ActivityLevel.lightlyActive:
-        return "Az hareketli";
-      case ActivityLevel.moderatelyActive:
-        return "Aktif";
-      case ActivityLevel.veryActive:
-        return "Çok aktif";
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return OnboardingStepLayout(
@@ -145,131 +132,158 @@ class _CalorieStepState extends State<CalorieStep>
       content: AnimatedBuilder(
         animation: _animation,
         builder: (context, child) {
-          return Column(
-            children: [
-              const SizedBox(height: 16),
+          return SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            child: Column(
+              children: [
+                const SizedBox(height: 16),
 
-              // Main Calorie Card
-              Transform.scale(
-                scale: 0.8 + (0.2 * _animation.value),
-                child: Opacity(
-                  opacity: _animation.value,
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(32),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          AppColors.primary.withValues(alpha: 0.2),
-                          AppColors.primary.withValues(alpha: 0.05),
+                // Main Calorie Card
+                Transform.scale(
+                  scale: 0.8 + (0.2 * _animation.value),
+                  child: Opacity(
+                    opacity: _animation.value,
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(32),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            AppColors.primary.withValues(alpha: 0.2),
+                            AppColors.primary.withValues(alpha: 0.05),
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(28),
+                        border: Border.all(
+                          color: AppColors.primary.withValues(alpha: 0.4),
+                          width: 2,
+                        ),
+                      ),
+                      child: Column(
+                        children: [
+                          Text(
+                            _goalLabel.toUpperCase(),
+                            style: TextStyle(
+                              color: AppColors.primary,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 1.5,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          TweenAnimationBuilder<int>(
+                            tween: IntTween(begin: 0, end: _dailyCalories),
+                            duration: const Duration(milliseconds: 1500),
+                            curve: Curves.easeOutCubic,
+                            builder: (context, value, child) {
+                              return Text(
+                                "$value",
+                                style: const TextStyle(
+                                  fontSize: 72,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white,
+                                  height: 1,
+                                  letterSpacing: -2,
+                                ),
+                              );
+                            },
+                          ),
+                          const SizedBox(height: 4),
+                          const Text(
+                            "kcal / gün",
+                            style: TextStyle(
+                              fontSize: 18,
+                              color: AppColors.textMuted,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
                         ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
                       ),
-                      borderRadius: BorderRadius.circular(28),
-                      border: Border.all(
-                        color: AppColors.primary.withValues(alpha: 0.4),
-                        width: 2,
-                      ),
-                    ),
-                    child: Column(
-                      children: [
-                        Text(
-                          _goalLabel.toUpperCase(),
-                          style: TextStyle(
-                            color: AppColors.primary,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 1.5,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        TweenAnimationBuilder<int>(
-                          tween: IntTween(begin: 0, end: _dailyCalories),
-                          duration: const Duration(milliseconds: 1500),
-                          curve: Curves.easeOutCubic,
-                          builder: (context, value, child) {
-                            return Text(
-                              "$value",
-                              style: const TextStyle(
-                                fontSize: 72,
-                                fontWeight: FontWeight.w800,
-                                color: Colors.white,
-                                height: 1,
-                                letterSpacing: -2,
-                              ),
-                            );
-                          },
-                        ),
-                        const SizedBox(height: 4),
-                        const Text(
-                          "kcal / gün",
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: AppColors.textMuted,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
                     ),
                   ),
                 ),
-              ),
 
-              const SizedBox(height: 32),
+                const SizedBox(height: 32),
 
-              // Breakdown
-              _buildBreakdownItem(
-                icon: Icons.monitor_weight_outlined,
-                label: "Bazal metabolizma",
-                value: "${_bmr.round()} kcal",
-                delay: 0.2,
-              ),
-              _buildBreakdownItem(
-                icon: Icons.directions_run,
-                label: "Aktivite seviyesi",
-                value:
-                    "$_activityLabel (×${_activityMultiplier.toStringAsFixed(2)})",
-                delay: 0.4,
-              ),
-              _buildBreakdownItem(
-                icon: Icons.flag_outlined,
-                label: "Hedef ayarlaması",
-                value: widget.profile.goal == GoalType.lose
-                    ? "-500 kcal"
-                    : widget.profile.goal == GoalType.gain
-                    ? "+300 kcal"
-                    : "±0 kcal",
-                delay: 0.6,
-              ),
-
-              const SizedBox(height: 24),
-
-              // Macros preview
-              Opacity(
-                opacity: _animation.value,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    _buildMacroChip(
-                      "Protein",
-                      "${widget.profile.dailyProteinGoal}g",
-                      Colors.purpleAccent,
-                    ),
-                    _buildMacroChip(
-                      "Karb",
-                      "${widget.profile.dailyCarbGoal}g",
-                      Colors.orangeAccent,
-                    ),
-                    _buildMacroChip(
-                      "Yağ",
-                      "${widget.profile.dailyFatGoal}g",
-                      Colors.amberAccent,
-                    ),
-                  ],
+                // Breakdown
+                _buildBreakdownItem(
+                  icon: Icons.monitor_weight_outlined,
+                  label: "Bazal metabolizma",
+                  value: "${_bmr.round()} kcal",
+                  delay: 0.2,
+                  onInfoTap: () {
+                    showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        backgroundColor: const Color(0xFF1E1E1E),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        title: const Text(
+                          "Bazal Metabolizma Nedir?",
+                          style: TextStyle(color: Colors.white),
+                        ),
+                        content: const Text(
+                          "Bazal Metabolizma Hızı (BMR), vücudunun dinlenme halindeyken yaşamını sürdürebilmesi için harcadığı minimum enerji miktarıdır. Yani nefes almak, kalp atışı, beyin ve organların çalışması, vücut ısısını korumak gibi temel hayati işlevler için gün boyunca yaktığın kalori.\n\nKısaca: Hiç hareket etmesen bile vücudun bu kaloriyi yakar.",
+                          style: TextStyle(color: Colors.white70),
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text("Anladım"),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
                 ),
-              ),
-            ],
+                _buildBreakdownItem(
+                  icon: Icons.directions_run,
+                  label: "Aktivite seviyesi",
+                  value: "+${(_tdee - _bmr).round()} kcal",
+                  delay: 0.4,
+                ),
+                _buildBreakdownItem(
+                  icon: Icons.flag_outlined,
+                  label: "Hedef ayarlaması",
+                  value: widget.profile.goal == GoalType.lose
+                      ? "-500 kcal"
+                      : widget.profile.goal == GoalType.gain
+                      ? "+300 kcal"
+                      : "±0 kcal",
+                  delay: 0.6,
+                ),
+
+                const SizedBox(height: 24),
+
+                // Macros preview
+                Opacity(
+                  opacity: _animation.value,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      _buildMacroChip(
+                        "Protein",
+                        "${widget.profile.dailyProteinGoal}g",
+                        Colors.purpleAccent,
+                      ),
+                      _buildMacroChip(
+                        "Karb",
+                        "${widget.profile.dailyCarbGoal}g",
+                        Colors.orangeAccent,
+                      ),
+                      _buildMacroChip(
+                        "Yağ",
+                        "${widget.profile.dailyFatGoal}g",
+                        Colors.amberAccent,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           );
         },
       ),
@@ -281,6 +295,7 @@ class _CalorieStepState extends State<CalorieStep>
     required String label,
     required String value,
     required double delay,
+    VoidCallback? onInfoTap,
   }) {
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0.0, end: 1.0),
@@ -310,6 +325,18 @@ class _CalorieStepState extends State<CalorieStep>
                       fontSize: 14,
                     ),
                   ),
+                  if (onInfoTap != null)
+                    GestureDetector(
+                      onTap: onInfoTap,
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 6),
+                        child: Icon(
+                          Icons.info_outline,
+                          size: 16,
+                          color: Colors.white.withValues(alpha: 0.4),
+                        ),
+                      ),
+                    ),
                   const Spacer(),
                   Text(
                     value,

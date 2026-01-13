@@ -171,7 +171,7 @@ class ShadcnButton extends StatelessWidget {
           onPressed: enabled ? onPressed : null,
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.primary,
-            foregroundColor: Colors.black,
+            foregroundColor: Colors.white,
             disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.5),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(14),

@@ -22,6 +22,11 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
   Map<int, Uint8List> _croppedImages = {};
   img.Image? _decodedImage;
 
+  // Selection state: which foods are checked for adding
+  Set<int> _selectedFoods = {};
+  // Portion multipliers: 0.5 = half, 1.0 = full, 1.5 = 1.5x
+  Map<int, double> _portionMultipliers = {};
+
   @override
   void initState() {
     super.initState();
@@ -94,6 +99,13 @@ If no food is detected, return empty array: []
       if (!mounted) return;
       setState(() {
         _isAnalyzing = false;
+        // Initialize all foods as selected with 1.0 portion
+        _selectedFoods = Set.from(
+          List.generate(_detectedFoods.length, (i) => i),
+        );
+        _portionMultipliers = {
+          for (var i = 0; i < _detectedFoods.length; i++) i: 1.0,
+        };
       });
     } catch (e) {
       debugPrint('Analysis error: $e');
@@ -159,25 +171,45 @@ If no food is detected, return empty array: []
     }
   }
 
-  int get _totalCalories => _detectedFoods.fold(
-    0,
-    (sum, f) => sum + ((f['calories'] as num?)?.toInt() ?? 0),
-  );
+  int get _totalCalories {
+    int total = 0;
+    for (int i = 0; i < _detectedFoods.length; i++) {
+      if (!_selectedFoods.contains(i)) continue;
+      final cal = ((_detectedFoods[i]['calories'] as num?)?.toInt() ?? 0);
+      total += (cal * (_portionMultipliers[i] ?? 1.0)).round();
+    }
+    return total;
+  }
 
-  int get _totalProtein => _detectedFoods.fold(
-    0,
-    (sum, f) => sum + ((f['protein'] as num?)?.toInt() ?? 0),
-  );
+  int get _totalProtein {
+    int total = 0;
+    for (int i = 0; i < _detectedFoods.length; i++) {
+      if (!_selectedFoods.contains(i)) continue;
+      final val = ((_detectedFoods[i]['protein'] as num?)?.toInt() ?? 0);
+      total += (val * (_portionMultipliers[i] ?? 1.0)).round();
+    }
+    return total;
+  }
 
-  int get _totalCarbs => _detectedFoods.fold(
-    0,
-    (sum, f) => sum + ((f['carbs'] as num?)?.toInt() ?? 0),
-  );
+  int get _totalCarbs {
+    int total = 0;
+    for (int i = 0; i < _detectedFoods.length; i++) {
+      if (!_selectedFoods.contains(i)) continue;
+      final val = ((_detectedFoods[i]['carbs'] as num?)?.toInt() ?? 0);
+      total += (val * (_portionMultipliers[i] ?? 1.0)).round();
+    }
+    return total;
+  }
 
-  int get _totalFat => _detectedFoods.fold(
-    0,
-    (sum, f) => sum + ((f['fat'] as num?)?.toInt() ?? 0),
-  );
+  int get _totalFat {
+    int total = 0;
+    for (int i = 0; i < _detectedFoods.length; i++) {
+      if (!_selectedFoods.contains(i)) continue;
+      final val = ((_detectedFoods[i]['fat'] as num?)?.toInt() ?? 0);
+      total += (val * (_portionMultipliers[i] ?? 1.0)).round();
+    }
+    return total;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -221,15 +253,6 @@ If no food is detected, return empty array: []
               ),
             ),
           ),
-          if (_isAnalyzing)
-            const SizedBox(
-              width: 24,
-              height: 24,
-              child: CircularProgressIndicator(
-                color: AppColors.primary,
-                strokeWidth: 2,
-              ),
-            ),
         ],
       ),
     );
@@ -253,7 +276,7 @@ If no food is detected, return empty array: []
         ),
         const SizedBox(height: 24),
         Text(
-          "Gemini AI yemekleri analiz ediyor...",
+          "Analiz yapılıyor...",
           style: TextStyle(
             color: Colors.white.withValues(alpha: 0.8),
             fontSize: 16,
@@ -434,61 +457,10 @@ If no food is detected, return empty array: []
 
           const SizedBox(height: 16),
 
-          // Foods List
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.restaurant_menu,
-                      color: AppColors.primary,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    const Text(
-                      "Tespit Edilen Yemekler",
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const Spacer(),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        "${_detectedFoods.length} öğe",
-                        style: const TextStyle(
-                          color: AppColors.primary,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                ...List.generate(
-                  _detectedFoods.length,
-                  (index) => _buildFoodItem(_detectedFoods[index], index),
-                ),
-              ],
-            ),
+          // Foods List - No container wrapper, save space
+          ...List.generate(
+            _detectedFoods.length,
+            (index) => _buildFoodItem(_detectedFoods[index], index),
           ),
 
           const SizedBox(height: 16),
@@ -512,7 +484,7 @@ If no food is detected, return empty array: []
                   const Icon(Icons.add_circle_outline, size: 20),
                   const SizedBox(width: 8),
                   Text(
-                    "Günlüğe Ekle (+$_totalCalories kcal)",
+                    "Günlüğe Ekle (+$_totalCalories)",
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -635,141 +607,225 @@ If no food is detected, return empty array: []
   }
 
   Widget _buildFoodItem(Map<String, dynamic> food, int index) {
-    final isHealthy = food['type'] == 'healthy';
     final hasCroppedImage = _croppedImages.containsKey(index);
+    final isSelected = _selectedFoods.contains(index);
+    final portion = _portionMultipliers[index] ?? 1.0;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.03),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isHealthy
-              ? Colors.green.withValues(alpha: 0.2)
-              : Colors.orange.withValues(alpha: 0.2),
-        ),
-      ),
-      child: Row(
-        children: [
-          // Cropped food image thumbnail
-          Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              color: AppColors.background,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: isHealthy
-                    ? Colors.green.withValues(alpha: 0.3)
-                    : Colors.orange.withValues(alpha: 0.3),
-                width: 2,
-              ),
-              image: hasCroppedImage
-                  ? DecorationImage(
-                      image: MemoryImage(_croppedImages[index]!),
-                      fit: BoxFit.cover,
-                    )
-                  : null,
-            ),
-            child: !hasCroppedImage
-                ? Icon(
-                    Icons.restaurant,
-                    color: isHealthy ? Colors.green : Colors.orange,
-                    size: 24,
-                  )
-                : null,
+    // Calculate adjusted values
+    final calories = ((food['calories'] as num?)?.toInt() ?? 0) * portion;
+    final protein = ((food['protein'] as num?)?.toInt() ?? 0) * portion;
+    final carbs = ((food['carbs'] as num?)?.toInt() ?? 0) * portion;
+    final fat = ((food['fat'] as num?)?.toInt() ?? 0) * portion;
+
+    return AnimatedOpacity(
+      duration: const Duration(milliseconds: 200),
+      opacity: isSelected ? 1.0 : 0.4,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected
+                ? AppColors.primary.withValues(alpha: 0.3)
+                : Colors.white.withValues(alpha: 0.05),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+        ),
+        child: Column(
+          children: [
+            // Main row: checkbox + image + name + calories
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                children: [
+                  // Checkbox
+                  GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        if (isSelected) {
+                          _selectedFoods.remove(index);
+                        } else {
+                          _selectedFoods.add(index);
+                        }
+                      });
+                    },
+                    child: Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? AppColors.primary
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: isSelected
+                              ? AppColors.primary
+                              : Colors.white.withValues(alpha: 0.3),
+                          width: 2,
+                        ),
+                      ),
+                      child: isSelected
+                          ? const Icon(
+                              Icons.check,
+                              color: Colors.white,
+                              size: 18,
+                            )
+                          : null,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+
+                  // Cropped food image thumbnail
+                  Container(
+                    width: 50,
+                    height: 50,
+                    decoration: BoxDecoration(
+                      color: AppColors.background,
+                      borderRadius: BorderRadius.circular(12),
+                      image: hasCroppedImage
+                          ? DecorationImage(
+                              image: MemoryImage(_croppedImages[index]!),
+                              fit: BoxFit.cover,
+                            )
+                          : null,
+                    ),
+                    child: !hasCroppedImage
+                        ? const Icon(
+                            Icons.restaurant,
+                            color: Colors.white54,
+                            size: 22,
+                          )
+                        : null,
+                  ),
+                  const SizedBox(width: 12),
+
+                  // Name and macros
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          food['name'] ?? 'Bilinmeyen',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 15,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          "P:${protein.round()}g  K:${carbs.round()}g  Y:${fat.round()}g",
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.5),
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Calories - prominent with kcal
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          "${calories.round()}",
+                          style: const TextStyle(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                          ),
+                        ),
+                        const SizedBox(width: 2),
+                        Text(
+                          "kcal",
+                          style: TextStyle(
+                            color: AppColors.primary.withValues(alpha: 0.7),
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Portion slider (only if selected)
+            if (isSelected)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                child: Row(
                   children: [
+                    Text(
+                      "Porsiyon",
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.5),
+                        fontSize: 12,
+                      ),
+                    ),
                     Expanded(
-                      child: Text(
-                        food['name'] ?? 'Bilinmeyen',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
+                      child: SliderTheme(
+                        data: SliderTheme.of(context).copyWith(
+                          trackHeight: 4,
+                          thumbShape: const RoundSliderThumbShape(
+                            enabledThumbRadius: 8,
+                          ),
+                          overlayShape: const RoundSliderOverlayShape(
+                            overlayRadius: 16,
+                          ),
+                          activeTrackColor: AppColors.primary,
+                          inactiveTrackColor: Colors.white.withValues(
+                            alpha: 0.1,
+                          ),
+                          thumbColor: AppColors.primary,
+                          overlayColor: AppColors.primary.withValues(
+                            alpha: 0.2,
+                          ),
+                        ),
+                        child: Slider(
+                          value: portion,
+                          min: 0.25,
+                          max: 2.0,
+                          divisions: 7,
+                          onChanged: (value) {
+                            setState(() {
+                              _portionMultipliers[index] = value;
+                            });
+                          },
                         ),
                       ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isHealthy
-                            ? Colors.green.withValues(alpha: 0.2)
-                            : Colors.orange.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
+                      width: 50,
+                      alignment: Alignment.centerRight,
                       child: Text(
-                        isHealthy ? "Sağlıklı" : "Dikkatli",
-                        style: TextStyle(
-                          color: isHealthy ? Colors.green : Colors.orange,
-                          fontSize: 10,
+                        "${(portion * 100).round()}%",
+                        style: const TextStyle(
+                          color: AppColors.primary,
                           fontWeight: FontWeight.bold,
+                          fontSize: 13,
                         ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    _buildMiniMacro(
-                      Icons.local_fire_department,
-                      "${food['calories']}",
-                      AppColors.primary,
-                    ),
-                    const SizedBox(width: 12),
-                    _buildMiniMacro(
-                      Icons.fitness_center,
-                      "${food['protein']}g",
-                      Colors.blue,
-                    ),
-                    const SizedBox(width: 12),
-                    _buildMiniMacro(
-                      Icons.grain,
-                      "${food['carbs']}g",
-                      Colors.orange,
-                    ),
-                    const SizedBox(width: 12),
-                    _buildMiniMacro(
-                      Icons.water_drop,
-                      "${food['fat']}g",
-                      Colors.red,
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMiniMacro(IconData icon, String value, Color color) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 12, color: color.withValues(alpha: 0.8)),
-        const SizedBox(width: 2),
-        Text(
-          value,
-          style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.7),
-            fontSize: 11,
-            fontWeight: FontWeight.w500,
-          ),
+              ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }

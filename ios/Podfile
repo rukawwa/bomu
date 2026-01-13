@@ -46,6 +46,9 @@ post_install do |installer|
       # Align all pods to the app deployment target to silence Xcode warnings.
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '17.0'
 
+      # Ensure Apple Silicon simulators are buildable (do not exclude arm64)
+
+
       # Enable permission_handler macros for iOS
       # This is REQUIRED for permission_handler to work properly on iOS
       config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= [

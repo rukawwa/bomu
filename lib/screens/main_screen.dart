@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'home_screen.dart';
 import 'food_library_screen.dart';
 import 'profile_screen.dart';
+import 'favorites_screen.dart';
+import '../models/food_entry.dart';
 import '../theme.dart';
 
 class MainScreen extends StatefulWidget {
@@ -36,7 +38,16 @@ class _MainScreenState extends State<MainScreen> {
 
   void _saveFood(FoodEntry entry) {
     setState(() {
-      savedFoods.add(entry);
+      // Prevent duplicates
+      if (!savedFoods.any((e) => e.name == entry.name)) {
+        savedFoods.add(entry);
+      }
+    });
+  }
+
+  void _removeSavedFood(FoodEntry entry) {
+    setState(() {
+      savedFoods.removeWhere((e) => e.name == entry.name);
     });
   }
 
@@ -79,7 +90,22 @@ class _MainScreenState extends State<MainScreen> {
         onUpdateEntry: _updateEntry,
         onSaveFood: _saveFood,
       ),
-      const FoodLibraryScreen(), // NEW
+      FoodLibraryScreen(
+        onAddEntry: _addEntry,
+        onSaveRecipe: _saveFood,
+        onAddFoodTap: () {
+          // Switch to Home tab (index 0) where the add food overlay exists
+          setState(() {
+            _currentIndex = 0;
+          });
+        },
+      ),
+      // FAVORITES SCREEN
+      FavoritesScreen(
+        savedFoods: savedFoods,
+        onAddEntry: _addEntry,
+        onRemoveFavorite: _removeSavedFood,
+      ),
       const ProfileScreen(),
     ];
 
@@ -108,9 +134,14 @@ class _MainScreenState extends State<MainScreen> {
               label: 'Tracker',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.search_rounded), // Changed Icon
+              icon: Icon(Icons.search_rounded),
               activeIcon: Icon(Icons.search_rounded, size: 28),
-              label: 'Library', // Changed Label
+              label: 'Library',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.favorite_border_rounded),
+              activeIcon: Icon(Icons.favorite_rounded, size: 28),
+              label: 'Favorites',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.person_rounded),

@@ -5,7 +5,7 @@ const { defineSecret } = require("firebase-functions/params");
 const geminiApiKey = defineSecret("GEMINI_API_KEY");
 
 /**
- * Cloud Function to analyze food images using Gemini API
+ * Cloud Function to analyze food images OR text using Gemini API
  * This keeps the API key secure on the server side
  */
 exports.analyzeFood = onCall(
@@ -18,19 +18,25 @@ exports.analyzeFood = onCall(
         console.log("=== analyzeFood called ===");
         console.log("Request data keys:", Object.keys(request.data || {}));
 
-        // Validate request
-        if (!request.data || !request.data.imageBase64) {
-            console.error("Missing imageBase64 in request");
-            throw new HttpsError("invalid-argument", "Image data is required");
+        const { imageBase64, prompt, textOnly } = request.data || {};
+
+        // Validate request - either image or textOnly mode required
+        if (!textOnly && !imageBase64) {
+            console.error("Missing imageBase64 or textOnly flag in request");
+            throw new HttpsError("invalid-argument", "Image data or text prompt is required");
         }
 
-        const { imageBase64, prompt } = request.data;
+        if (!prompt) {
+            console.error("Missing prompt in request");
+            throw new HttpsError("invalid-argument", "Prompt is required");
+        }
+
         const apiKey = geminiApiKey.value();
 
-        console.log("Image base64 length:", imageBase64?.length);
+        console.log("Text only mode:", !!textOnly);
+        console.log("Image base64 length:", imageBase64?.length || 0);
         console.log("Prompt:", prompt?.substring(0, 100));
         console.log("API Key present:", !!apiKey);
-        console.log("API Key first 10 chars:", apiKey?.substring(0, 10));
 
         if (!apiKey) {
             console.error("API key not configured");
@@ -40,31 +46,52 @@ exports.analyzeFood = onCall(
         try {
             console.log("Calling Gemini API...");
 
+            // Build request body based on mode
+            let requestBody;
+
+            if (textOnly) {
+                // Text-only analysis (for written food descriptions)
+                requestBody = {
+                    contents: [
+                        {
+                            role: "user",
+                            parts: [{ text: prompt }],
+                        },
+                    ],
+                    generationConfig: {
+                        responseMimeType: "application/json",
+                    },
+                };
+            } else {
+                // Image analysis
+                requestBody = {
+                    contents: [
+                        {
+                            role: "user",
+                            parts: [
+                                { text: prompt },
+                                {
+                                    inlineData: {
+                                        mimeType: "image/jpeg",
+                                        data: imageBase64,
+                                    },
+                                },
+                            ],
+                        },
+                    ],
+                    generationConfig: {
+                        responseMimeType: "application/json",
+                    },
+                };
+            }
+
             // Call Gemini API
             const response = await fetch(
                 `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
                 {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        contents: [
-                            {
-                                role: "user",
-                                parts: [
-                                    { text: prompt },
-                                    {
-                                        inlineData: {
-                                            mimeType: "image/jpeg",
-                                            data: imageBase64,
-                                        },
-                                    },
-                                ],
-                            },
-                        ],
-                        generationConfig: {
-                            responseMimeType: "application/json",
-                        },
-                    }),
+                    body: JSON.stringify(requestBody),
                 }
             );
 

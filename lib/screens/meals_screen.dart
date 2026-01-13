@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import '../models/food_entry.dart'; // Fixed import
 import '../theme.dart';
-import 'home_screen.dart'; // For FoodEntry class
 
 class MealsScreen extends StatelessWidget {
   final List<FoodEntry> entries;

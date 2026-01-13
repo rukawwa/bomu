@@ -8,7 +8,7 @@ enum GoalSpeed { slow, moderate, aggressive }
 
 enum CoachingStyle { strict, supportive }
 
-enum DietType { classic, vegetarian, vegan, keto, paleo, pescatarian }
+enum DietType { classic, vegetarian, vegan, keto, paleo, pescatarian, halal }
 
 class UserProfile {
   // Personal
