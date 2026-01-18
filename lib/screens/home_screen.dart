@@ -482,7 +482,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                     allFoods,
                                   );
 
-                              if (!mounted) return;
+                              if (!context.mounted) return;
                               Navigator.pop(context);
 
                               if (foods.isNotEmpty) {
@@ -490,7 +490,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                               }
                             } catch (e) {
                               setModalState(() => isLoading = false);
-                              if (mounted) {
+                              if (context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
                                     content: Text("Analiz başarısız: $e"),
@@ -970,24 +970,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildMacroChip(String label, int value, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(
-        "$label: ${value}g",
-        style: TextStyle(
-          color: color,
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
     );
   }
 
@@ -1905,39 +1887,3 @@ class _PremiumSwipeActionsState extends State<_PremiumSwipeActions>
 }
 
 enum _SwipeDirection { left, right }
-
-/// Custom painter for drawing dotted lines
-class _DottedLinePainter extends CustomPainter {
-  final Color color;
-  final double strokeWidth;
-  final double dashLength;
-  final double dashGap;
-
-  _DottedLinePainter({
-    required this.color,
-    this.strokeWidth = 2,
-    this.dashLength = 4,
-    this.dashGap = 4,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..strokeWidth = strokeWidth
-      ..style = PaintingStyle.fill;
-
-    double startY = 0;
-    while (startY < size.height) {
-      canvas.drawCircle(
-        Offset(size.width / 2, startY + dashLength / 2),
-        strokeWidth / 2,
-        paint,
-      );
-      startY += dashLength + dashGap;
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}

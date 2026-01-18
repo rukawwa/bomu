@@ -23,8 +23,16 @@ class FoodLibraryScreen extends StatefulWidget {
 }
 
 class _FoodLibraryScreenState extends State<FoodLibraryScreen> {
-  final String _searchQuery = "";
+  String _searchQuery = "";
   final List<String> _activeFilters = [];
+  bool _isSearching = false;
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   // Dummy Recipes
   final List<Recipe> _allRecipes = [
@@ -192,47 +200,84 @@ class _FoodLibraryScreenState extends State<FoodLibraryScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text(
-          "Yemek Kütüphanesi",
-          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
-        ),
+        title: _isSearching
+            ? TextField(
+                controller: _searchController,
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(
+                  hintText: "Yemek ara...",
+                  hintStyle: TextStyle(color: Colors.white54),
+                  border: InputBorder.none,
+                ),
+                onChanged: (value) {
+                  setState(() {
+                    _searchQuery = value;
+                  });
+                },
+                autofocus: true,
+              )
+            : const Text(
+                "Yemek Kütüphanesi",
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
         backgroundColor: AppColors.background,
         elevation: 0,
         centerTitle: false,
+        leading: _isSearching
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back, color: Colors.white),
+                onPressed: () {
+                  setState(() {
+                    _isSearching = false;
+                    _searchQuery = "";
+                    _searchController.clear();
+                  });
+                },
+              )
+            : null,
         actions: [
           // Search Button
           IconButton(
-            icon: const Icon(Icons.search, color: Colors.white70),
+            icon: Icon(
+              _isSearching ? Icons.close : Icons.search,
+              color: Colors.white70,
+            ),
             onPressed: () {
-              // TODO: Implement search modal
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text("Arama yakında eklenecek!"),
-                  backgroundColor: AppColors.surface,
-                ),
-              );
+              setState(() {
+                if (_isSearching) {
+                  _isSearching = false;
+                  _searchQuery = "";
+                  _searchController.clear();
+                } else {
+                  _isSearching = true;
+                }
+              });
             },
           ),
           // Filter Button
-          GestureDetector(
-            onTap: _showFilterBottomSheet,
-            child: Container(
-              margin: const EdgeInsets.only(right: 16),
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: _activeFilters.isNotEmpty
-                    ? AppColors.primary.withValues(alpha: 0.2)
-                    : Colors.transparent,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(
-                Icons.tune,
-                color: _activeFilters.isNotEmpty
-                    ? AppColors.primary
-                    : Colors.white70,
+          if (!_isSearching)
+            GestureDetector(
+              onTap: _showFilterBottomSheet,
+              child: Container(
+                margin: const EdgeInsets.only(right: 16),
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: _activeFilters.isNotEmpty
+                      ? AppColors.primary.withValues(alpha: 0.2)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.tune,
+                  color: _activeFilters.isNotEmpty
+                      ? AppColors.primary
+                      : Colors.white70,
+                ),
               ),
             ),
-          ),
         ],
       ),
       body: CustomScrollView(
