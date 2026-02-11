@@ -1,14 +1,22 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../theme.dart';
 import '../models/food_entry.dart';
 import '../models/recipe.dart';
+import '../models/custom_food.dart';
 import 'food_library/recipe_detail_screen.dart';
+import 'my_foods/my_food_detail_screen.dart';
+import '../widgets/custom_toast.dart';
 
 class FoodLibraryScreen extends StatefulWidget {
   final Function(FoodEntry) onAddEntry;
   final Function(FoodEntry)? onSaveRecipe;
   final List<String> savedRecipeIds;
   final VoidCallback? onAddFoodTap;
+  final List<CustomFood> publicFoods;
+  final Set<String> likedFoodIds;
+  final Function(String)? onToggleLike;
 
   const FoodLibraryScreen({
     super.key,
@@ -16,6 +24,9 @@ class FoodLibraryScreen extends StatefulWidget {
     this.onSaveRecipe,
     this.savedRecipeIds = const [],
     this.onAddFoodTap,
+    this.publicFoods = const [],
+    this.likedFoodIds = const {},
+    this.onToggleLike,
   });
 
   @override
@@ -333,6 +344,98 @@ class _FoodLibraryScreenState extends State<FoodLibraryScreen> {
             ),
           ),
 
+          // Community Foods Section
+          if (widget.publicFoods.isNotEmpty) ...[
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 4,
+                      height: 20,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    const Text(
+                      "Topluluk Yemekleri",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '${widget.publicFoods.length}',
+                        style: const TextStyle(
+                          color: AppColors.primary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 32),
+              sliver: SliverGrid(
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  mainAxisSpacing: 16,
+                  crossAxisSpacing: 16,
+                  childAspectRatio: 0.75,
+                ),
+                delegate: SliverChildBuilderDelegate((context, index) {
+                  return _buildCommunityFoodCard(widget.publicFoods[index]);
+                }, childCount: widget.publicFoods.length),
+              ),
+            ),
+          ],
+
+          // Section header for built-in recipes
+          if (widget.publicFoods.isNotEmpty)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 4,
+                      height: 20,
+                      decoration: BoxDecoration(
+                        color: Colors.orangeAccent,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    const Text(
+                      "Tarifler",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
           // Recipe Grid
           if (_filteredRecipes.isEmpty)
             SliverToBoxAdapter(
@@ -365,6 +468,7 @@ class _FoodLibraryScreenState extends State<FoodLibraryScreen> {
       ),
       floatingActionButton: widget.onAddFoodTap != null
           ? FloatingActionButton(
+              heroTag: 'food_library_fab',
               onPressed: widget.onAddFoodTap,
               backgroundColor: AppColors.primary,
               child: const Icon(Icons.add, color: Colors.white, size: 28),
@@ -374,7 +478,14 @@ class _FoodLibraryScreenState extends State<FoodLibraryScreen> {
   }
 
   Widget _buildRecipeCard(Recipe recipe) {
-    return GestureDetector(
+    return _buildFoodCard(
+      id: recipe.id,
+      name: recipe.name,
+      calories: recipe.calories,
+      protein: recipe.protein,
+      carbs: recipe.carbs,
+      imageProvider: NetworkImage(recipe.imageUrl),
+      isLiked: widget.savedRecipeIds.contains(recipe.id),
       onTap: () {
         Navigator.push(
           context,
@@ -382,10 +493,101 @@ class _FoodLibraryScreenState extends State<FoodLibraryScreen> {
             builder: (context) => RecipeDetailScreen(
               recipe: recipe,
               onAddEntry: widget.onAddEntry,
+              isLiked: widget.savedRecipeIds.contains(recipe.id),
+              onToggleLike: widget.onSaveRecipe != null
+                  ? () {
+                      final entry = FoodEntry(
+                        id: 'lib_${recipe.id}',
+                        name: recipe.name,
+                        calories: recipe.calories,
+                        protein: recipe.protein,
+                        carbs: recipe.carbs,
+                        fat: recipe.fat,
+                        type: recipe.type,
+                        time: 0,
+                      );
+                      widget.onSaveRecipe!(entry);
+                      ToastUtils.showSuccess(
+                        context,
+                        "${recipe.name} favorilere eklendi!",
+                      );
+                    }
+                  : null,
             ),
           ),
         );
       },
+      onLike: widget.onSaveRecipe != null
+          ? () {
+              final entry = FoodEntry(
+                id: 'lib_${recipe.id}',
+                name: recipe.name,
+                calories: recipe.calories,
+                protein: recipe.protein,
+                carbs: recipe.carbs,
+                fat: recipe.fat,
+                type: recipe.type,
+                time: 0,
+              );
+              widget.onSaveRecipe!(entry);
+              ToastUtils.showSuccess(
+                context,
+                "${recipe.name} favorilere eklendi!",
+              );
+            }
+          : null,
+    );
+  }
+
+  Widget _buildCommunityFoodCard(CustomFood food) {
+    return _buildFoodCard(
+      id: food.id,
+      name: food.name,
+      calories: food.calories,
+      protein: food.protein,
+      carbs: food.carbs,
+      imageProvider: food.imagePath != null
+          ? FileImage(File(food.imagePath!))
+          : null,
+      isLiked: widget.likedFoodIds.contains(food.id),
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => MyFoodDetailScreen(
+              food: food,
+              onLogFood: widget.onAddEntry,
+              isLiked: widget.likedFoodIds.contains(food.id),
+              onToggleLike: widget.onToggleLike != null
+                  ? () {
+                      HapticFeedback.lightImpact();
+                      widget.onToggleLike!(food.id);
+                    }
+                  : null,
+            ),
+          ),
+        );
+      },
+      onLike: () {
+        HapticFeedback.lightImpact();
+        widget.onToggleLike?.call(food.id);
+      },
+    );
+  }
+
+  Widget _buildFoodCard({
+    required String id,
+    required String name,
+    required int calories,
+    required int protein,
+    required int carbs,
+    required ImageProvider? imageProvider,
+    required bool isLiked,
+    required VoidCallback onTap,
+    VoidCallback? onLike,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
           color: AppColors.cardBackground,
@@ -401,51 +603,43 @@ class _FoodLibraryScreenState extends State<FoodLibraryScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Image with Heart Button
+            // Image with Like Button
             Stack(
               children: [
                 Hero(
-                  tag: recipe.id,
+                  tag: id,
                   child: Container(
                     height: 120,
+                    width: double.infinity,
                     decoration: BoxDecoration(
                       borderRadius: const BorderRadius.vertical(
                         top: Radius.circular(20),
                       ),
-                      image: DecorationImage(
-                        image: NetworkImage(recipe.imageUrl),
-                        fit: BoxFit.cover,
-                      ),
+                      color: AppColors.background,
+                      image: imageProvider != null
+                          ? DecorationImage(
+                              image: imageProvider,
+                              fit: BoxFit.cover,
+                            )
+                          : null,
                     ),
+                    child: imageProvider == null
+                        ? Center(
+                            child: Icon(
+                              Icons.restaurant_rounded,
+                              color: AppColors.primary.withValues(alpha: 0.3),
+                              size: 40,
+                            ),
+                          )
+                        : null,
                   ),
                 ),
-                // Heart Button
-                if (widget.onSaveRecipe != null)
+                if (onLike != null)
                   Positioned(
                     top: 8,
                     right: 8,
                     child: GestureDetector(
-                      onTap: () {
-                        final entry = FoodEntry(
-                          id: 'lib_${recipe.id}',
-                          name: recipe.name,
-                          calories: recipe.calories,
-                          protein: recipe.protein,
-                          carbs: recipe.carbs,
-                          fat: recipe.fat,
-                          type: recipe.type,
-                          time: 0,
-                        );
-                        widget.onSaveRecipe!(entry);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              "${recipe.name} favorilere eklendi! ❤️",
-                            ),
-                            backgroundColor: const Color(0xFF16A34A),
-                          ),
-                        );
-                      },
+                      onTap: onLike,
                       child: Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
@@ -453,12 +647,8 @@ class _FoodLibraryScreenState extends State<FoodLibraryScreen> {
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
-                          widget.savedRecipeIds.contains(recipe.id)
-                              ? Icons.favorite
-                              : Icons.favorite_border,
-                          color: widget.savedRecipeIds.contains(recipe.id)
-                              ? Colors.redAccent
-                              : Colors.white,
+                          isLiked ? Icons.favorite : Icons.favorite_border,
+                          color: isLiked ? Colors.redAccent : Colors.white,
                           size: 18,
                         ),
                       ),
@@ -466,69 +656,45 @@ class _FoodLibraryScreenState extends State<FoodLibraryScreen> {
                   ),
               ],
             ),
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    recipe.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.local_fire_department,
-                        size: 14,
-                        color: AppColors.primary,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        "${recipe.calories} kcal",
-                        style: const TextStyle(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
+                    // Stats Row
+                    Row(
+                      children: [
+                        // Calories (Primary)
+                        Text(
+                          "$calories kcal",
+                          style: const TextStyle(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.access_time,
-                        size: 14,
-                        color: Colors.white54,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        "${recipe.prepTimeMinutes} dk",
-                        style: const TextStyle(
-                          color: Colors.white54,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  // Macros Row
-                  Row(
-                    children: [
-                      _buildMiniMacro("P", recipe.protein),
-                      const SizedBox(width: 8),
-                      _buildMiniMacro("C", recipe.carbs),
-                      const SizedBox(width: 8),
-                      _buildMiniMacro("F", recipe.fat),
-                    ],
-                  ),
-                ],
+                        const Spacer(),
+                        // Protein
+                        _buildMicroStats("P", protein, Colors.purpleAccent),
+                        const SizedBox(width: 8),
+                        // Carbs
+                        _buildMicroStats("K", carbs, Colors.orangeAccent),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
@@ -537,21 +703,25 @@ class _FoodLibraryScreenState extends State<FoodLibraryScreen> {
     );
   }
 
-  Widget _buildMiniMacro(String label, int value) {
+  Widget _buildMicroStats(String label, int value, Color color) {
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
       children: [
+        Text(
+          "$value",
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.9),
+            fontWeight: FontWeight.bold,
+            fontSize: 12,
+          ),
+        ),
         Text(
           label,
           style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.5),
+            color: color.withValues(alpha: 0.8),
             fontSize: 10,
             fontWeight: FontWeight.bold,
           ),
-        ),
-        const SizedBox(width: 2),
-        Text(
-          "$value",
-          style: const TextStyle(color: Colors.white70, fontSize: 10),
         ),
       ],
     );

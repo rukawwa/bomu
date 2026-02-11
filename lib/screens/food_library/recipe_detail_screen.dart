@@ -7,11 +7,15 @@ import 'package:uuid/uuid.dart';
 class RecipeDetailScreen extends StatefulWidget {
   final Recipe recipe;
   final Function(FoodEntry) onAddEntry;
+  final bool isLiked;
+  final VoidCallback? onToggleLike;
 
   const RecipeDetailScreen({
     super.key,
     required this.recipe,
     required this.onAddEntry,
+    this.isLiked = false,
+    this.onToggleLike,
   });
 
   @override
@@ -172,6 +176,28 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
             expandedHeight: 300,
             pinned: true,
             backgroundColor: AppColors.background,
+            actions: [
+              if (widget.onToggleLike != null)
+                Container(
+                  margin: const EdgeInsets.only(right: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.3),
+                    shape: BoxShape.circle,
+                  ),
+                  child: IconButton(
+                    icon: Icon(
+                      widget.isLiked ? Icons.favorite : Icons.favorite_border,
+                      color: widget.isLiked ? Colors.redAccent : Colors.white,
+                      size: 24,
+                    ),
+                    onPressed: () {
+                      if (widget.onToggleLike != null) {
+                        widget.onToggleLike!();
+                      }
+                    },
+                  ),
+                ),
+            ],
             flexibleSpace: FlexibleSpaceBar(
               background: Stack(
                 fit: StackFit.expand,
@@ -321,6 +347,7 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'recipe_detail_fab',
         onPressed: _showPortionDialog,
         backgroundColor: AppColors.primary,
         icon: const Icon(Icons.add, color: Colors.white),

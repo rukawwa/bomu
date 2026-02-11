@@ -7,7 +7,9 @@ import '../../theme.dart';
 import 'analysis_screen.dart';
 
 class CameraScreen extends StatefulWidget {
-  const CameraScreen({super.key});
+  final String? context;
+
+  const CameraScreen({super.key, this.context});
 
   @override
   State<CameraScreen> createState() => _CameraScreenState();
@@ -122,7 +124,8 @@ class _CameraScreenState extends State<CameraScreen>
       final results = await Navigator.push<List<Map<String, dynamic>>>(
         context,
         MaterialPageRoute(
-          builder: (context) => AnalysisScreen(imagePath: image.path),
+          builder: (context) =>
+              AnalysisScreen(imagePath: image.path, context: widget.context),
         ),
       );
 

@@ -15,13 +15,18 @@ class GeminiService {
   static Future<List<Map<String, dynamic>>> analyzeFood({
     required String base64Image,
     required String prompt,
+    String? context,
   }) async {
+    final fullPrompt = context != null
+        ? "$prompt\n\nCONTEXT: $context\n\nTask: Detect foods and provide a specific 'analysis' (max 2 sentences) for each item based on the context (time, goals, etc.). Field: 'analysis'."
+        : prompt;
+
     try {
       final response = await http.post(
         Uri.parse(_functionsUrl),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'data': {'imageBase64': base64Image, 'prompt': prompt},
+          'data': {'imageBase64': base64Image, 'prompt': fullPrompt},
         }),
       );
 
@@ -97,13 +102,18 @@ class GeminiService {
 
   /// Analyze food from text description using Firebase Cloud Function
   static Future<List<Map<String, dynamic>>> analyzeFoodFromText(
-    String text,
-  ) async {
+    String text, {
+    String? context,
+  }) async {
+    final contextPrompt = context != null
+        ? "\nBAĞLAM (Context): $context\n\nGÖREV: Her yemek için 'analysis' alanında, bağlama göre (saat, hedefler vb.) kısa, spesifik bir yorum yap (max 2 cümle)."
+        : "";
+
     final prompt =
         '''
 Kullanıcının yazdığı yemekleri analiz et ve her biri için besin değerlerini tahmin et.
 
-KULLANICI GİRDİSİ: "$text"
+KULLANICI GİRDİSİ: "$text"$contextPrompt
 
 Her yemek için JSON formatında döndür:
 [
@@ -113,13 +123,15 @@ Her yemek için JSON formatında döndür:
     "protein": 25,
     "carbs": 30,
     "fat": 10,
-    "type": "healthy"
+    "type": "healthy",
+    "analysis": "Geç saatte yüksek karbonhidrat, dikkatli olmalısın."
   }
 ]
 
 Kurallar:
 - calories, protein, carbs, fat değerleri integer olmalı
 - type sadece "healthy" veya "unhealthy" olabilir
+- analysis alanı Türkçe olmalı ve motive edici veya uyarıcı olmalı
 - Birden fazla yemek varsa hepsini ayrı ayrı listele
 - SADECE JSON array döndür, açıklama yazma
 ''';

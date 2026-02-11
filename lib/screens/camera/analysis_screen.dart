@@ -8,8 +8,9 @@ import '../../services/gemini_service.dart';
 
 class AnalysisScreen extends StatefulWidget {
   final String imagePath;
+  final String? context;
 
-  const AnalysisScreen({super.key, required this.imagePath});
+  const AnalysisScreen({super.key, required this.imagePath, this.context});
 
   @override
   State<AnalysisScreen> createState() => _AnalysisScreenState();
@@ -84,6 +85,7 @@ If no food is detected, return empty array: []
       final foods = await GeminiService.analyzeFood(
         base64Image: base64Image,
         prompt: prompt,
+        context: widget.context,
       );
 
       debugPrint('Detected foods: $foods');

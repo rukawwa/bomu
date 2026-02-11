@@ -1,19 +1,38 @@
 import 'package:flutter/material.dart';
 import '../../models/user_profile.dart';
+import '../../services/user_profile_service.dart';
 import '../../theme.dart';
 import '../main_screen.dart';
 
 class SubscriptionScreen extends StatefulWidget {
   final UserProfile userProfile;
+  final bool isFromOnboarding;
+  final Function(bool isPremium)? onPlanSelected;
 
-  const SubscriptionScreen({super.key, required this.userProfile});
+  const SubscriptionScreen({
+    super.key,
+    required this.userProfile,
+    this.isFromOnboarding = true,
+    this.onPlanSelected,
+  });
 
   @override
   State<SubscriptionScreen> createState() => _SubscriptionScreenState();
 }
 
 class _SubscriptionScreenState extends State<SubscriptionScreen> {
-  bool _isPlusSelected = true;
+  late bool _isPlusSelected;
+
+  @override
+  void initState() {
+    super.initState();
+    // Default to existing selection if available, else true (Plus)
+    _isPlusSelected = widget.userProfile.isPremium;
+    // But if coming from onboarding, default to Plus usually
+    if (widget.isFromOnboarding) {
+      _isPlusSelected = true;
+    }
+  }
 
   final List<_Feature> _features = [
     _Feature("Günlük kalori takibi", free: true, plus: true),
@@ -48,12 +67,30 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           CustomScrollView(
             slivers: [
               // Invisible SliverAppBar to anchor the sticky header
-              const SliverAppBar(
+              SliverAppBar(
                 backgroundColor: Colors.transparent,
                 pinned: true,
                 toolbarHeight: 56,
                 automaticallyImplyLeading: false,
                 elevation: 0,
+                // Add Close button if not from onboarding
+                leading: !widget.isFromOnboarding
+                    ? IconButton(
+                        icon: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.3),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.close_rounded,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                        ),
+                        onPressed: () => Navigator.pop(context),
+                      )
+                    : null,
               ),
 
               // Header (scrolls with content)
@@ -64,7 +101,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        "İlk haftanız bizden! 🎁",
+                        "Paketini Seç",
                         style: TextStyle(
                           fontSize: 28,
                           fontWeight: FontWeight.w800,
@@ -75,7 +112,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        "Planını seç",
+                        widget.isFromOnboarding
+                            ? "İlk haftanız bizden! 🎁"
+                            : "İhtiyacına uygun planı belirle",
                         style: TextStyle(
                           fontSize: 15,
                           color: Colors.white.withValues(alpha: 0.6),
@@ -140,7 +179,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                 ),
               ),
 
-              SliverToBoxAdapter(child: SizedBox(height: 24)),
+              const SliverToBoxAdapter(child: SizedBox(height: 24)),
 
               // Sticky Header for comparison table
               SliverPersistentHeader(
@@ -322,7 +361,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
             right: 0,
             child: Container(
               height: topPadding + 56,
-              color: AppColors.background,
+              color: AppColors.background.withValues(
+                alpha: 0.0,
+              ), // Transparent top
             ),
           ),
 
@@ -363,17 +404,35 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                       color: _isPlusSelected ? null : const Color(0xFF3A3A4E),
                     ),
                     child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.pushAndRemoveUntil(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => MainScreen(
-                              initialDailyGoal:
-                                  widget.userProfile.dailyCalorieLimit,
-                            ),
-                          ),
-                          (route) => false,
+                      onPressed: () async {
+                        // Update profile Subscription Status
+                        final updatedProfile = widget.userProfile.copyWith(
+                          isPremium: _isPlusSelected,
                         );
+
+                        await UserProfileService.saveProfile(updatedProfile);
+
+                        // Callback if provided
+                        if (widget.onPlanSelected != null) {
+                          widget.onPlanSelected!(_isPlusSelected);
+                        }
+
+                        if (!context.mounted) return;
+
+                        if (widget.isFromOnboarding) {
+                          // Standard Onboarding Flow
+                          Navigator.pushAndRemoveUntil(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  MainScreen(userProfile: updatedProfile),
+                            ),
+                            (route) => false,
+                          );
+                        } else {
+                          // Just pop if called from Profile
+                          Navigator.pop(context);
+                        }
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.transparent,
@@ -386,24 +445,14 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                       ),
                       child: Text(
                         _isPlusSelected
-                            ? "Ücretsiz Denemeyi Başlat"
-                            : "Ücretsiz Başla",
+                            ? "Planı Seç ve Devam Et"
+                            : "Seçimi Kaydet",
                         style: const TextStyle(
                           fontSize: 17,
                           fontWeight: FontWeight.w700,
                           color: Colors.white,
                         ),
                       ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    _isPlusSelected
-                        ? "İstediğin zaman iptal edebilirsin"
-                        : "Dilediğin zaman Plus'a yükseltebilirsin",
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.white.withValues(alpha: 0.4),
                     ),
                   ),
                 ],
@@ -416,23 +465,19 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 
   Widget _buildColumnHeader(String title, bool isSelected) {
-    return Container(
+    return SizedBox(
       width: 60,
-      height: 48,
-      decoration: BoxDecoration(
-        color: isSelected ? _highlightColor : Colors.transparent,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-      ),
       child: Center(
-        child: Text(
-          title,
+        child: AnimatedDefaultTextStyle(
+          duration: const Duration(milliseconds: 200),
           style: TextStyle(
-            fontSize: 14,
+            fontSize: isSelected ? 16 : 14,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
             color: isSelected
                 ? Colors.white
                 : Colors.white.withValues(alpha: 0.5),
-            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
           ),
+          child: Text(title),
         ),
       ),
     );
@@ -446,8 +491,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     required String priceNote,
     required bool isSelected,
     required bool isPrimary,
-    List<_TimelineItem>? timeline,
     required VoidCallback onTap,
+    List<_TimelineItem>? timeline,
   }) {
     return GestureDetector(
       onTap: onTap,
@@ -455,32 +500,13 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          gradient: isSelected
-              ? (isPrimary
-                    ? LinearGradient(
-                        colors: [
-                          AppColors.primary.withValues(alpha: 0.15),
-                          AppColors.primary.withValues(alpha: 0.05),
-                        ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      )
-                    : LinearGradient(
-                        colors: [
-                          const Color(0xFF505065),
-                          const Color(0xFF353545),
-                        ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ))
-              : null,
-          color: isPrimary
-              ? null
-              : (isSelected ? Colors.transparent : Colors.transparent),
-          borderRadius: BorderRadius.circular(20),
+          color: isSelected
+              ? AppColors.primary.withValues(alpha: 0.1)
+              : const Color(0xFF1C1C1E),
+          borderRadius: BorderRadius.circular(24),
           border: Border.all(
             color: isSelected
-                ? (isPrimary ? AppColors.primary : const Color(0xFF505065))
+                ? AppColors.primary
                 : Colors.white.withValues(alpha: 0.1),
             width: isSelected ? 2 : 1,
           ),
@@ -488,177 +514,129 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header
             Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                if (title == "Plus")
-                  const SparkleIcon(size: 20, color: AppColors.primary)
-                else
-                  Text(icon, style: const TextStyle(fontSize: 20)),
-                const SizedBox(width: 8),
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                  ),
-                ),
-                if (isPrimary) ...[
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      "Önerilen",
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.w600,
+                Row(
+                  children: [
+                    Text(icon, style: const TextStyle(fontSize: 24)),
+                    const SizedBox(width: 12),
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
                       ),
                     ),
-                  ),
-                ],
-                const Spacer(),
-                // Radio
-                Container(
-                  width: 24,
-                  height: 24,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: isSelected
-                          ? (isPrimary
-                                ? AppColors.primary
-                                : const Color(0xFF2A2A3E))
-                          : Colors.white38,
-                      width: 2,
-                    ),
-                    color: isSelected
-                        ? (isPrimary
-                              ? AppColors.primary
-                              : const Color(0xFF2A2A3E))
-                        : Colors.transparent,
-                  ),
-                  child: isSelected
-                      ? const Icon(Icons.check, size: 14, color: Colors.white)
-                      : null,
+                  ],
                 ),
+                if (isSelected)
+                  const Icon(
+                    Icons.check_circle_rounded,
+                    color: AppColors.primary,
+                    size: 24,
+                  )
+                else
+                  Icon(
+                    Icons.circle_outlined,
+                    color: Colors.white.withValues(alpha: 0.3),
+                    size: 24,
+                  ),
               ],
             ),
-
-            const SizedBox(height: 8),
-
+            const SizedBox(height: 12),
             Text(
               description,
               style: TextStyle(
                 fontSize: 14,
-                color: Colors.white.withValues(alpha: 0.6),
+                color: Colors.white.withValues(alpha: 0.7),
+                height: 1.4,
               ),
             ),
-
-            const SizedBox(height: 8),
-
-            Row(
-              children: [
-                Text(
-                  price,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Colors.white,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  priceNote,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.white.withValues(alpha: 0.4),
-                  ),
-                ),
-              ],
-            ),
-
-            // Timeline (only for Plus)
+            const SizedBox(height: 16),
             if (timeline != null && isSelected) ...[
-              const SizedBox(height: 20),
-              ...timeline.asMap().entries.map((entry) {
-                final item = entry.value;
-                final isLast = entry.key == timeline.length - 1;
-
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Column(
-                      children: [
-                        Container(
-                          width: 32,
-                          height: 32,
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withValues(alpha: 0.2),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            item.icon,
-                            size: 16,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                        if (!isLast)
-                          Container(
-                            width: 2,
-                            height: 24,
-                            color: AppColors.primary.withValues(alpha: 0.3),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(width: 12),
-                    Padding(
-                      padding: const EdgeInsets.only(top: 6),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Column(
+                  children: timeline.map((item) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Row(
                         children: [
-                          RichText(
-                            text: TextSpan(
-                              children: [
-                                TextSpan(
-                                  text: "${item.day}: ",
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.white,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                                TextSpan(
-                                  text: item.description,
-                                  style: TextStyle(
-                                    color: Colors.white.withValues(alpha: 0.6),
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ],
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.1),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              item.icon,
+                              size: 14,
+                              color: Colors.white,
                             ),
                           ),
-                          if (!isLast) const SizedBox(height: 16),
+                          const SizedBox(width: 12),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                item.title,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              Text(
+                                item.subtitle,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.white.withValues(alpha: 0.6),
+                                ),
+                              ),
+                            ],
+                          ),
                         ],
                       ),
-                    ),
-                  ],
-                );
-              }),
+                    );
+                  }).toList(),
+                ),
+              ),
+              const SizedBox(height: 16),
             ],
+            Text(
+              price,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+            Text(
+              priceNote,
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.white.withValues(alpha: 0.5),
+              ),
+            ),
           ],
         ),
       ),
     );
   }
+}
+
+class _TimelineItem {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+
+  _TimelineItem(this.title, this.subtitle, this.icon);
 }
 
 class _Feature {
@@ -669,18 +647,15 @@ class _Feature {
   _Feature(this.name, {required this.free, required this.plus});
 }
 
-class _TimelineItem {
-  final String day;
-  final String description;
-  final IconData icon;
-
-  _TimelineItem(this.day, this.description, this.icon);
-}
-
 class _StickyHeaderDelegate extends SliverPersistentHeaderDelegate {
   final Widget child;
 
   _StickyHeaderDelegate({required this.child});
+
+  @override
+  double get minExtent => 60;
+  @override
+  double get maxExtent => 60;
 
   @override
   Widget build(
@@ -688,18 +663,13 @@ class _StickyHeaderDelegate extends SliverPersistentHeaderDelegate {
     double shrinkOffset,
     bool overlapsContent,
   ) {
-    return SizedBox(height: maxExtent, child: child);
+    return child;
   }
 
   @override
-  double get maxExtent => 48;
-
-  @override
-  double get minExtent => 48;
-
-  @override
-  bool shouldRebuild(covariant SliverPersistentHeaderDelegate oldDelegate) =>
-      true;
+  bool shouldRebuild(_StickyHeaderDelegate oldDelegate) {
+    return oldDelegate.child != child;
+  }
 }
 
 class SparkleIcon extends StatelessWidget {
@@ -710,46 +680,6 @@ class SparkleIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return CustomPaint(size: Size(size, size), painter: _SparklePainter(color));
+    return Icon(Icons.auto_awesome, size: size, color: color);
   }
-}
-
-class _SparklePainter extends CustomPainter {
-  final Color color;
-
-  _SparklePainter(this.color);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill
-      ..strokeWidth = 1.5;
-
-    final scale = size.width / 24.0;
-    canvas.scale(scale, scale);
-
-    // Path 1
-    final path1 = Path();
-    path1.moveTo(8, 15);
-    path1.cubicTo(12.8747, 15, 15, 12.949, 15, 8);
-    path1.cubicTo(15, 12.949, 17.1104, 15, 22, 15);
-    path1.cubicTo(17.1104, 15, 15, 17.1104, 15, 22);
-    path1.cubicTo(15, 17.1104, 12.8747, 15, 8, 15);
-    path1.close();
-    canvas.drawPath(path1, paint);
-
-    // Path 2
-    final path2 = Path();
-    path2.moveTo(2, 6.5);
-    path2.cubicTo(5.13376, 6.5, 6.5, 5.18153, 6.5, 2);
-    path2.cubicTo(6.5, 5.18153, 7.85669, 6.5, 11, 6.5);
-    path2.cubicTo(7.85669, 6.5, 6.5, 7.85669, 6.5, 11);
-    path2.cubicTo(6.5, 7.85669, 5.13376, 6.5, 2, 6.5);
-    path2.close();
-    canvas.drawPath(path2, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

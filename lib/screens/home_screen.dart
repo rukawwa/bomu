@@ -5,15 +5,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../theme.dart';
-import '../services/gemini_service.dart';
-
-import 'camera/camera_screen.dart';
+import '../widgets/custom_toast.dart';
+import '../models/user_profile.dart';
 
 // --- MODELLER ---
 import '../models/food_entry.dart';
 
 class HomeScreen extends StatefulWidget {
-  final int? initialDailyGoal;
+  final UserProfile userProfile;
   final List<FoodEntry> entries;
   final List<FoodEntry> savedFoods;
   final Function(FoodEntry) onAddEntry;
@@ -23,7 +22,7 @@ class HomeScreen extends StatefulWidget {
 
   const HomeScreen({
     super.key,
-    this.initialDailyGoal,
+    required this.userProfile,
     required this.entries,
     required this.savedFoods,
     required this.onAddEntry,
@@ -39,10 +38,10 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   late int dailyGoal;
 
-  // -- NEW: Goals & State for Detailed view --
-  int get proteinGoal => 150;
-  int get carbsGoal => 275;
-  int get fatGoal => 75;
+  // -- Goals from UserProfile --
+  int get proteinGoal => widget.userProfile.dailyProteinGoal;
+  int get carbsGoal => widget.userProfile.dailyCarbGoal;
+  int get fatGoal => widget.userProfile.dailyFatGoal;
   bool _showDetailedMacros = false; // Toggles between "100g" and "100/150g"
 
   bool isScanning = false;
@@ -74,7 +73,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
-    dailyGoal = widget.initialDailyGoal ?? 2200;
+    dailyGoal = widget.userProfile.dailyCalorieLimit;
 
     // Page Controller Setup
     _pageController = PageController(initialPage: 0);
@@ -97,6 +96,28 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _timer = Timer.periodic(const Duration(minutes: 1), (timer) {
       setState(() => currentTime = DateTime.now());
     });
+  }
+
+  @override
+  void didUpdateWidget(covariant HomeScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    // Recalculate old total calories from previous entries
+    final oldTotal = oldWidget.entries.fold(
+      0,
+      (sum, item) => sum + item.calories,
+    );
+
+    // Update daily goal if profile changed
+    final newGoal = widget.userProfile.dailyCalorieLimit;
+    if (dailyGoal != newGoal) {
+      dailyGoal = newGoal;
+    }
+
+    // Re-trigger animation if calories changed
+    if (oldTotal != totalCalories) {
+      _updateProgressAnimation(oldTotal);
+    }
   }
 
   @override
@@ -123,467 +144,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           ),
         );
     _progressController.forward(from: 0);
-  }
-
-  void _showAddMealOptions() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(24),
-        decoration: const BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              "Nasıl eklemek istersin?",
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildOptionCard(
-                    icon: Icons.camera_alt,
-                    title: "Kamera",
-                    subtitle: "AI Analizi",
-                    color: AppColors.primary,
-                    onTap: () async {
-                      Navigator.pop(context);
-                      final results =
-                          await Navigator.push<List<Map<String, dynamic>>>(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const CameraScreen(),
-                            ),
-                          );
-                      if (results != null && results.isNotEmpty) {
-                        _addFoodsFromAnalysis(results);
-                      }
-                    },
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: _buildOptionCard(
-                    icon: Icons.menu_book_rounded,
-                    title: "Defter",
-                    subtitle: "Kayıtlılar",
-                    color: Colors.blueAccent,
-                    onTap: () {
-                      Navigator.pop(context);
-                      _openFoodBookSelection();
-                    },
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildOptionCard(
-                    icon: Icons.edit_note,
-                    title: "Yazarak Ekle",
-                    subtitle: "Yemek Adı Gir",
-                    color: Colors.tealAccent,
-                    onTap: () {
-                      Navigator.pop(context);
-                      _showTextFoodInput();
-                    },
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildOptionCard({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppColors.background,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withValues(alpha: 0.3)),
-        ),
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, color: color, size: 32),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              title,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            Text(
-              subtitle,
-              style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _openFoodBookSelection() {
-    if (widget.savedFoods.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Yemek defterin boş. Önce yemek kaydetmelisin."),
-        ),
-      );
-      return;
-    }
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppColors.surface,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.6,
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              "Yemek Defterinden Seç",
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Expanded(
-              child: ListView.separated(
-                itemCount: widget.savedFoods.length,
-                separatorBuilder: (c, i) => const SizedBox(height: 12),
-                itemBuilder: (context, index) {
-                  final food = widget.savedFoods[index];
-                  return ListTile(
-                    onTap: () {
-                      final now = DateTime.now();
-                      final decimalTime = now.hour + now.minute / 60.0;
-                      int oldTotal = totalCalories;
-
-                      widget.onAddEntry(
-                        FoodEntry(
-                          id: DateTime.now().millisecondsSinceEpoch.toString(),
-                          name: food.name,
-                          calories: food.calories,
-                          type: food.type,
-                          time: decimalTime,
-                          imageFile: null,
-                          protein: food.protein,
-                          carbs: food.carbs,
-                          fat: food.fat,
-                        ),
-                      );
-
-                      _updateProgressAnimation(oldTotal);
-                      Navigator.pop(context);
-                    },
-                    tileColor: AppColors.background,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    leading: Icon(
-                      Icons.restaurant,
-                      color: food.type == FoodType.healthy
-                          ? AppColors.primary
-                          : AppColors.secondary,
-                    ),
-                    title: Text(
-                      food.name,
-                      style: const TextStyle(color: Colors.white),
-                    ),
-                    trailing: Text(
-                      "${food.calories} kcal",
-                      style: const TextStyle(color: AppColors.textMuted),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showTextFoodInput() {
-    final textController = TextEditingController();
-    bool isLoading = false;
-    List<String> foodItems = [];
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setModalState) => Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom,
-          ),
-          child: Container(
-            padding: const EdgeInsets.all(24),
-            decoration: const BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  "Ne yedin?",
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  "Yemek adını yaz, Enter'a bas ve devam et",
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.5),
-                    fontSize: 14,
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // Food chips
-                if (foodItems.isNotEmpty)
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: foodItems
-                        .map(
-                          (food) => Chip(
-                            label: Text(
-                              food,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 13,
-                              ),
-                            ),
-                            backgroundColor: AppColors.primary.withValues(
-                              alpha: 0.2,
-                            ),
-                            deleteIcon: Icon(
-                              Icons.close,
-                              size: 16,
-                              color: Colors.white.withValues(alpha: 0.7),
-                            ),
-                            onDeleted: () {
-                              setModalState(() {
-                                foodItems.remove(food);
-                              });
-                            },
-                            side: BorderSide(
-                              color: AppColors.primary.withValues(alpha: 0.3),
-                            ),
-                          ),
-                        )
-                        .toList(),
-                  ),
-
-                if (foodItems.isNotEmpty) const SizedBox(height: 12),
-
-                // Text field
-                TextField(
-                  controller: textController,
-                  autofocus: true,
-                  style: const TextStyle(color: Colors.white, fontSize: 16),
-                  textInputAction: TextInputAction.done,
-                  onSubmitted: (value) {
-                    final trimmed = value.trim();
-                    if (trimmed.isNotEmpty) {
-                      setModalState(() {
-                        foodItems.add(trimmed);
-                        textController.clear();
-                      });
-                    }
-                  },
-                  onChanged: (_) => setModalState(() {}),
-                  decoration: InputDecoration(
-                    hintText: foodItems.isEmpty
-                        ? "örn: tavuk sote, pilav"
-                        : "Başka bir yemek ekle...",
-                    hintStyle: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.3),
-                    ),
-                    filled: true,
-                    fillColor: AppColors.background,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 14,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed:
-                        (isLoading ||
-                            (foodItems.isEmpty &&
-                                textController.text.trim().isEmpty))
-                        ? null
-                        : () async {
-                            setModalState(() => isLoading = true);
-
-                            // Include current text field content if not empty
-                            final currentText = textController.text.trim();
-                            final allItems = [...foodItems];
-                            if (currentText.isNotEmpty) {
-                              allItems.add(currentText);
-                            }
-                            final allFoods = allItems.join(", ");
-
-                            try {
-                              final foods =
-                                  await GeminiService.analyzeFoodFromText(
-                                    allFoods,
-                                  );
-
-                              if (!context.mounted) return;
-                              Navigator.pop(context);
-
-                              if (foods.isNotEmpty) {
-                                _addFoodsFromAnalysis(foods);
-                              }
-                            } catch (e) {
-                              setModalState(() => isLoading = false);
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text("Analiz başarısız: $e"),
-                                    backgroundColor: Colors.red,
-                                  ),
-                                );
-                              }
-                            }
-                          },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
-                      disabledBackgroundColor: AppColors.primary.withValues(
-                        alpha: 0.3,
-                      ),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: isLoading
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : Builder(
-                            builder: (context) {
-                              final chipCount = foodItems.length;
-                              final hasText = textController.text
-                                  .trim()
-                                  .isNotEmpty;
-                              final total = chipCount + (hasText ? 1 : 0);
-                              return Text(
-                                total == 0
-                                    ? "Yemek yaz"
-                                    : "Analiz Et ($total yemek)",
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                ),
-                              );
-                            },
-                          ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _addFoodsFromAnalysis(List<Map<String, dynamic>> foods) {
-    final now = DateTime.now();
-    final decimalTime = now.hour + now.minute / 60.0;
-    final oldTotal = totalCalories;
-
-    for (final food in foods) {
-      final imageBytes = food['croppedImageBytes'] as Uint8List?;
-
-      widget.onAddEntry(
-        FoodEntry(
-          id: '${DateTime.now().millisecondsSinceEpoch}_${food['name']}',
-          name: food['name']?.toString() ?? 'Bilinmeyen',
-          calories: (food['calories'] as num?)?.toInt() ?? 0,
-          protein: (food['protein'] as num?)?.toInt() ?? 0,
-          carbs: (food['carbs'] as num?)?.toInt() ?? 0,
-          fat: (food['fat'] as num?)?.toInt() ?? 0,
-          type: food['type'] == 'healthy'
-              ? FoodType.healthy
-              : FoodType.unhealthy,
-          time: decimalTime,
-          imageBytes: imageBytes,
-        ),
-      );
-    }
-
-    _updateProgressAnimation(oldTotal);
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          '${foods.length} yemek eklendi! (+${foods.fold(0, (sum, f) => sum + ((f['calories'] as num?)?.toInt() ?? 0))} kcal)',
-        ),
-        backgroundColor: AppColors.primary,
-      ),
-    );
   }
 
   @override
@@ -618,11 +178,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             ),
           ],
         ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _showAddMealOptions,
-        backgroundColor: AppColors.primary,
-        child: const Icon(Icons.add, color: Colors.white),
       ),
     );
   }
@@ -727,30 +282,37 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           _buildMainTracker(limitExceeded),
           const SizedBox(height: 24),
           // Macros Column
-          Column(
+          // Macros Row
+          Row(
             children: [
-              _buildMacroIndicator(
-                "Protein",
-                totalProtein,
-                proteinGoal,
-                Colors.purpleAccent,
-                Icons.fitness_center,
+              Expanded(
+                child: _buildMacroIndicator(
+                  "Protein",
+                  totalProtein,
+                  proteinGoal,
+                  Colors.purpleAccent,
+                  Icons.fitness_center,
+                ),
               ),
-              const SizedBox(height: 16),
-              _buildMacroIndicator(
-                "Carbs",
-                totalCarbs,
-                carbsGoal,
-                Colors.orangeAccent,
-                Icons.bolt,
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildMacroIndicator(
+                  "Carbs",
+                  totalCarbs,
+                  carbsGoal,
+                  Colors.orangeAccent,
+                  Icons.bolt,
+                ),
               ),
-              const SizedBox(height: 16),
-              _buildMacroIndicator(
-                "Fat",
-                totalFat,
-                fatGoal,
-                Colors.amberAccent,
-                Icons.opacity,
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildMacroIndicator(
+                  "Fat",
+                  totalFat,
+                  fatGoal,
+                  Colors.amberAccent,
+                  Icons.opacity,
+                ),
               ),
             ],
           ),
@@ -845,23 +407,28 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final isHealthy = entry.type == FoodType.healthy;
     final accentColor = isHealthy ? Colors.green : AppColors.primary;
 
-    // Generate coach comment
-    String coachComment;
-    if (isHealthy) {
-      if (entry.protein > 20) {
-        coachComment = "Harika protein seçimi! 💪";
-      } else if (entry.carbs > entry.fat) {
-        coachComment = "Dengeli bir öğün 👍";
+    // Determine feedback text
+    String feedbackText = entry.aiAnalysis ?? "";
+    bool isAiFeedback = feedbackText.isNotEmpty;
+
+    if (!isAiFeedback) {
+      // Fallback to hardcoded logic if no AI analysis
+      if (isHealthy) {
+        if (entry.protein > 20) {
+          feedbackText = "Harika protein seçimi! 💪";
+        } else if (entry.carbs > entry.fat) {
+          feedbackText = "Dengeli bir öğün 👍";
+        } else {
+          feedbackText = "Sağlıklı tercih! 🌱";
+        }
       } else {
-        coachComment = "Sağlıklı tercih! 🌱";
-      }
-    } else {
-      if (entry.calories > 500) {
-        coachComment = "Yüksek kalori ⚠️";
-      } else if (entry.fat > entry.protein) {
-        coachComment = "Yağ oranı yüksek";
-      } else {
-        coachComment = "Ara sıra olur 🔄";
+        if (entry.calories > 500) {
+          feedbackText = "Yüksek kalori ⚠️";
+        } else if (entry.fat > entry.protein) {
+          feedbackText = "Yağ oranı yüksek";
+        } else {
+          feedbackText = "Ara sıra olur 🔄";
+        }
       }
     }
 
@@ -871,102 +438,222 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final timeString =
         "${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}";
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Left side: Simple dot + line
-        SizedBox(
-          width: 24,
-          child: Column(
-            children: [
-              // Simple dot (no glow)
-              Container(
-                width: 10,
-                height: 10,
-                decoration: BoxDecoration(
-                  color: accentColor,
-                  shape: BoxShape.circle,
-                ),
-              ),
-              // Simple line
-              if (!isLast)
-                Container(
-                  width: 2,
-                  height: 100,
-                  color: Colors.white.withValues(alpha: 0.1),
-                ),
-            ],
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF2A292E), // Darker card background
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.2),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
-        ),
-
-        const SizedBox(width: 16),
-
-        // Right side: Content
-        Expanded(
-          child: Padding(
-            padding: EdgeInsets.only(bottom: isLast ? 0 : 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+        ],
+      ),
+      child: Column(
+        children: [
+          // Header: Time + Type + Calories
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+            child: Row(
               children: [
-                // Time + Status row
-                Row(
-                  children: [
-                    Text(
-                      timeString,
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.5),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.access_time_rounded,
+                        size: 14,
+                        color: Colors.white.withValues(alpha: 0.7),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      isHealthy ? "Sağlıklı" : "Dikkatli",
-                      style: TextStyle(
-                        color: accentColor,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
+                      const SizedBox(width: 4),
+                      Text(
+                        timeString,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.9),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 4),
-
-                // Food name
-                Text(
-                  entry.name,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 16,
+                    ],
                   ),
                 ),
-
-                const SizedBox(height: 4),
-
-                // Calories + Macros inline
-                Text(
-                  "${entry.calories} kcal  •  P:${entry.protein}g  K:${entry.carbs}g  Y:${entry.fat}g",
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.4),
-                    fontSize: 12,
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
                   ),
-                ),
-
-                const SizedBox(height: 6),
-
-                // Coach comment (simple)
-                Text(
-                  coachComment,
-                  style: TextStyle(
-                    color: accentColor.withValues(alpha: 0.8),
-                    fontSize: 12,
-                    fontStyle: FontStyle.italic,
+                  decoration: BoxDecoration(
+                    color: accentColor.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: accentColor.withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: Text(
+                    isHealthy ? "Sağlıklı" : "Dikkatli",
+                    style: TextStyle(
+                      color: accentColor,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ],
             ),
+          ),
+
+          // Divider
+          Divider(height: 1, color: Colors.white.withValues(alpha: 0.05)),
+
+          // Main Content
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Food Image (if available) or Icon
+                Container(
+                  width: 60,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    color: AppColors.background,
+                    borderRadius: BorderRadius.circular(12),
+                    image: entry.imageBytes != null
+                        ? DecorationImage(
+                            image: MemoryImage(entry.imageBytes!),
+                            fit: BoxFit.cover,
+                          )
+                        : null,
+                  ),
+                  child: entry.imageBytes == null
+                      ? Icon(
+                          Icons.restaurant,
+                          color: Colors.white.withValues(alpha: 0.2),
+                          size: 24,
+                        )
+                      : null,
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        entry.name,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        "${entry.calories} kcal",
+                        style: TextStyle(
+                          color: AppColors.primary.withValues(alpha: 1),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      // Macros
+                      Row(
+                        children: [
+                          _buildMiniMacro(
+                            "P",
+                            entry.protein,
+                            Colors.purpleAccent,
+                          ),
+                          const SizedBox(width: 12),
+                          _buildMiniMacro(
+                            "K",
+                            entry.carbs,
+                            Colors.orangeAccent,
+                          ),
+                          const SizedBox(width: 12),
+                          _buildMiniMacro("Y", entry.fat, Colors.amberAccent),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Feedback Section
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: isAiFeedback
+                  ? AppColors.primary.withValues(alpha: 0.1)
+                  : Colors.white.withValues(alpha: 0.03),
+              borderRadius: const BorderRadius.vertical(
+                bottom: Radius.circular(20),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  isAiFeedback
+                      ? Icons.auto_awesome
+                      : Icons.chat_bubble_outline_rounded,
+                  size: 16,
+                  color: isAiFeedback
+                      ? AppColors.primary
+                      : Colors.white.withValues(alpha: 0.4),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    feedbackText,
+                    style: TextStyle(
+                      color: isAiFeedback
+                          ? Colors.white.withValues(alpha: 0.9)
+                          : Colors.white.withValues(alpha: 0.6),
+                      fontSize: 13,
+                      fontStyle: isAiFeedback
+                          ? FontStyle.normal
+                          : FontStyle.italic,
+                      height: 1.3,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMiniMacro(String label, int value, Color color) {
+    return Row(
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 4),
+        Text(
+          "${value}g",
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.6),
+            fontSize: 11,
+            fontWeight: FontWeight.w500,
           ),
         ),
       ],
@@ -1093,75 +780,68 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     IconData icon,
   ) {
     return Container(
-      padding: const EdgeInsets.all(20),
-      // Use standard card decoration matching the Water Tracker
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(
-          alpha: 0.05,
-        ), // Matches inactive circle background
-        borderRadius: BorderRadius.circular(24),
+        color: Colors.white.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              // Icon Container
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.2),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(icon, color: color, size: 24),
-              ),
-              const SizedBox(width: 16),
-              // Text Info
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    label,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                  ),
-                  RichText(
-                    text: TextSpan(
-                      children: [
-                        TextSpan(
-                          text: "$value",
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.9),
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                          ),
-                        ),
-                        TextSpan(
-                          text: " / ${target}g",
-                          style: const TextStyle(
-                            color: AppColors.textMuted,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          // Wider and more prominent Progress Bar
+          // Icon
           Container(
-            height: 12, // Increased height for better visibility
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.2),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: color, size: 20),
+          ),
+          const SizedBox(height: 12),
+
+          // Label
+          Text(
+            label,
+            style: const TextStyle(
+              color: AppColors.textMuted,
+              fontWeight: FontWeight.w600,
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 4),
+
+          // Value
+          // Value
+          RichText(
+            text: TextSpan(
+              children: [
+                TextSpan(
+                  text: "$value",
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.9),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+                TextSpan(
+                  text: " / ${target}g",
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.5),
+                    fontSize: 10,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Progress Bar
+          Container(
+            height: 6,
             width: double.infinity,
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(6),
+              borderRadius: BorderRadius.circular(3),
             ),
             child: FractionallySizedBox(
               alignment: Alignment.centerLeft,
@@ -1169,12 +849,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               child: Container(
                 decoration: BoxDecoration(
                   color: color,
-                  borderRadius: BorderRadius.circular(6),
+                  borderRadius: BorderRadius.circular(3),
                   boxShadow: [
                     BoxShadow(
                       color: color.withValues(alpha: 0.5),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
+                      blurRadius: 4,
+                      offset: const Offset(0, 1),
                     ),
                   ],
                 ),
@@ -1296,26 +976,18 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       key: Key(entry.id),
       onDelete: () {
         widget.onRemoveEntry(entry);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("${entry.name} silindi"),
-            backgroundColor: AppColors.surface,
-            action: SnackBarAction(
-              label: "Geri Al",
-              textColor: AppColors.primary,
-              onPressed: () => widget.onAddEntry(entry),
-            ),
-          ),
+        ToastUtils.showInfo(
+          context,
+          "${entry.name} silindi",
+          actionLabel: "Geri Al",
+          onAction: () {
+            widget.onAddEntry(entry);
+          },
         );
       },
       onSave: () {
         widget.onSaveFood(entry);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("${entry.name} favorilere eklendi! ❤️"),
-            backgroundColor: const Color(0xFF16A34A),
-          ),
-        );
+        ToastUtils.showSuccess(context, "${entry.name} favorilere eklendi!");
       },
       child: Container(
         padding: const EdgeInsets.all(12),

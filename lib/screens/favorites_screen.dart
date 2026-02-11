@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme.dart';
 import '../models/food_entry.dart';
+import '../widgets/custom_toast.dart';
 
 class FavoritesScreen extends StatelessWidget {
   final List<FoodEntry> savedFoods;
@@ -79,21 +80,17 @@ class FavoritesScreen extends StatelessWidget {
                     );
                     onAddEntry(newEntry);
                     HapticFeedback.mediumImpact();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text("${food.name} eklendi! 🍽️"),
-                        backgroundColor: AppColors.primary,
-                      ),
+                    ToastUtils.showSuccess(
+                      context,
+                      "${food.name} eklendi! 🍽️",
                     );
                   },
                   onRemove: () {
                     onRemoveFavorite(food);
                     HapticFeedback.mediumImpact();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text("${food.name} favorilerden kaldırıldı"),
-                        backgroundColor: AppColors.surface,
-                      ),
+                    ToastUtils.showInfo(
+                      context,
+                      "${food.name} favorilerden kaldırıldı",
                     );
                   },
                 );
